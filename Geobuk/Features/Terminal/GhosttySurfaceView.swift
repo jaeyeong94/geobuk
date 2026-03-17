@@ -9,8 +9,11 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     nonisolated(unsafe) private var surface: ghostty_surface_t?
     private weak var ghosttyApp: GhosttyApp?
 
-    /// 키 입력 시 IME로부터 누적된 텍스트
-    private var keyTextAccumulator: [String] = []
+    /// IME marked text (한글 조합 등)
+    private var markedText = NSMutableAttributedString()
+
+    /// keyDown 중 insertText로부터 누적된 텍스트 (nil = keyDown 밖)
+    private var keyTextAccumulator: [String]?
 
     /// surface 존재 여부
     var hasSurface: Bool { surface != nil }
@@ -24,10 +27,6 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     init(app: GhosttyApp, cwd: String? = nil, command: String? = nil) {
         self.ghosttyApp = app
         super.init(frame: .zero)
-
-        // wantsLayer를 설정하지 않음 — libghostty가 자체 CAMetalLayer를 관리
-        // wantsLayer = true 를 설정하면 기본 CALayer가 생성되어
-        // Metal 렌더링과 충돌하고 리사이즈 시 잔상이 남음
 
         guard let appHandle = app.appHandle else { return }
 
@@ -86,37 +85,18 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         updateContentScale()
     }
 
-    override func setFrameSize(_ newSize: NSSize) {
-        super.setFrameSize(newSize)
-        notifySurfaceOfSize(newSize)
-    }
-
-    override func layout() {
-        super.layout()
-        notifySurfaceOfSize(bounds.size)
-    }
-
     // MARK: - Size & Scale
 
-    /// 뷰 크기 변경 시 surface에 전달 (중복 호출 방지)
-    private var lastNotifiedSize: CGSize = .zero
-
-    private func notifySurfaceOfSize(_ size: CGSize) {
+    /// SurfaceContainerView.layout()에서 호출
+    func sizeDidChange(_ size: CGSize) {
         guard let surface else { return }
         guard size.width > 0 && size.height > 0 else { return }
         let backingSize = convertToBacking(size)
-        guard backingSize != lastNotifiedSize else { return }
-        lastNotifiedSize = backingSize
         ghostty_surface_set_size(
             surface,
             UInt32(backingSize.width),
             UInt32(backingSize.height)
         )
-    }
-
-    /// 외부에서 호출되는 크기 변경 (SwiftUI GeometryReader 등)
-    func sizeDidChange(_ size: CGSize) {
-        notifySurfaceOfSize(size)
     }
 
     /// 포커스 상태 변경
@@ -126,7 +106,7 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     }
 
     /// 콘텐츠 스케일 업데이트
-    private func updateContentScale() {
+    func updateContentScale() {
         guard let surface, let window else { return }
         let scale = window.backingScaleFactor
         ghostty_surface_set_content_scale(surface, scale, scale)
@@ -152,18 +132,31 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyDown(with event: NSEvent) {
+        guard let surface else { return }
+
+        // Ghostty 패턴: keyDown 중에만 accumulator 활성화
         keyTextAccumulator = []
+        defer { keyTextAccumulator = nil }
+
+        // marked text 상태 기억 (composing 판별용)
+        let markedTextBefore = markedText.length > 0
+
         interpretKeyEvents([event])
 
-        guard let surface else { return }
-        var keyEvent = event.ghosttyKeyEvent(action: GHOSTTY_ACTION_PRESS)
-        // IME 텍스트가 있으면 composing text로 전달
-        if !keyTextAccumulator.isEmpty {
-            let text = keyTextAccumulator.joined()
-            text.withCString { ptr in
-                ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
+        // preedit 동기화 (한글 조합 중 상태 반영)
+        syncPreedit(clearIfNeeded: markedTextBefore)
+
+        if let list = keyTextAccumulator, !list.isEmpty {
+            // 조합 완료된 텍스트 전달
+            for text in list {
+                text.withCString { ptr in
+                    ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
+                }
             }
         } else {
+            // 일반 키 이벤트 (화살표, Enter, Backspace 등)
+            var keyEvent = event.ghosttyKeyEvent(action: GHOSTTY_ACTION_PRESS)
+            keyEvent.composing = markedText.length > 0 || markedTextBefore
             _ = ghostty_surface_key(surface, keyEvent)
         }
     }
@@ -282,35 +275,49 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     // MARK: - NSTextInputClient (IME 지원)
 
     func insertText(_ string: Any, replacementRange: NSRange) {
-        let str: String
-        if let s = string as? NSAttributedString {
-            str = s.string
-        } else if let s = string as? String {
-            str = s
-        } else {
-            return
+        guard NSApp.currentEvent != nil else { return }
+
+        let chars: String
+        switch string {
+        case let v as NSAttributedString: chars = v.string
+        case let v as String: chars = v
+        default: return
         }
-        keyTextAccumulator.append(str)
+
+        // insertText → preedit 종료
+        unmarkText()
+
+        // keyDown 중이면 accumulate, 아니면 직접 전달
+        if keyTextAccumulator != nil {
+            keyTextAccumulator?.append(chars)
+        } else {
+            guard let surface else { return }
+            chars.withCString { ptr in
+                ghostty_surface_text(surface, ptr, UInt(chars.utf8.count))
+            }
+        }
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
-        guard let surface else { return }
-        let str: String
-        if let s = string as? NSAttributedString {
-            str = s.string
-        } else if let s = string as? String {
-            str = s
-        } else {
-            return
+        switch string {
+        case let v as NSAttributedString:
+            markedText = NSMutableAttributedString(attributedString: v)
+        case let v as String:
+            markedText = NSMutableAttributedString(string: v)
+        default: return
         }
-        str.withCString { ptr in
-            ghostty_surface_preedit(surface, ptr, UInt(str.utf8.count))
+
+        // keyDown 밖에서 호출되면 즉시 preedit 동기화 (입력기 전환 등)
+        if keyTextAccumulator == nil {
+            syncPreedit()
         }
     }
 
     func unmarkText() {
-        guard let surface else { return }
-        ghostty_surface_preedit(surface, nil, 0)
+        if markedText.length > 0 {
+            markedText.mutableString.setString("")
+            syncPreedit()
+        }
     }
 
     func selectedRange() -> NSRange {
@@ -318,10 +325,28 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     }
 
     func markedRange() -> NSRange {
-        NSRange(location: NSNotFound, length: 0)
+        if markedText.length > 0 {
+            return NSRange(location: 0, length: markedText.length)
+        }
+        return NSRange(location: NSNotFound, length: 0)
     }
 
-    func hasMarkedText() -> Bool { false }
+    func hasMarkedText() -> Bool { markedText.length > 0 }
+
+    /// marked text ↔ ghostty_surface_preedit 동기화 (Ghostty 패턴)
+    private func syncPreedit(clearIfNeeded: Bool = true) {
+        guard let surface else { return }
+
+        if markedText.length > 0 {
+            let str = markedText.string
+            str.withCString { ptr in
+                // utf8CString은 null terminator 포함, -1로 제외
+                ghostty_surface_preedit(surface, ptr, UInt(max(str.utf8CString.count - 1, 0)))
+            }
+        } else if clearIfNeeded {
+            ghostty_surface_preedit(surface, nil, 0)
+        }
+    }
 
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
         nil

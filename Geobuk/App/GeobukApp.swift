@@ -45,6 +45,16 @@ struct GeobukApp: App {
                     NotificationCenter.default.post(name: .focusNextPane, object: nil)
                 }
                 .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+
+                Button("Focus Pane Above") {
+                    NotificationCenter.default.post(name: .focusPreviousPane, object: nil)
+                }
+                .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+
+                Button("Focus Pane Below") {
+                    NotificationCenter.default.post(name: .focusNextPane, object: nil)
+                }
+                .keyboardShortcut(.downArrow, modifiers: [.command, .option])
             }
         }
     }

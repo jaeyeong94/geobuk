@@ -56,12 +56,9 @@ struct SplitPaneView: View {
             switch content {
             case .terminal:
                 if let surfaceView = surfaceViewProvider(content.id) {
-                    GeometryReader { geo in
-                        TerminalSurfaceRepresentable(
-                            surfaceView: surfaceView,
-                            size: geo.size
-                        )
-                    }
+                    TerminalSurfaceRepresentable(
+                        surfaceView: surfaceView
+                    )
                 } else {
                     Color.black
                         .overlay {
