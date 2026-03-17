@@ -37,7 +37,16 @@ final class GhosttyApp {
         guard let cfg = ghostty_config_new() else {
             throw GhosttyError.configCreationFailed
         }
+        // 사용자 Ghostty 설정 로드 (~/.config/ghostty/config)
         ghostty_config_load_default_files(cfg)
+
+        // Geobuk 기본 설정 오버라이드 (cursor-style = bar 등)
+        if let configPath = Bundle.main.path(forResource: "geobuk-default", ofType: "conf") {
+            configPath.withCString { ptr in
+                ghostty_config_load_file(cfg, ptr)
+            }
+        }
+
         ghostty_config_finalize(cfg)
         self.config = cfg
 
