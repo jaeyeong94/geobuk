@@ -26,6 +26,13 @@ struct GeobukApp: App {
                     NotificationCenter.default.post(name: .splitVertically, object: nil)
                 }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("Close Pane") {
+                    NotificationCenter.default.post(name: .closePane, object: nil)
+                }
+                .keyboardShortcut("w", modifiers: .command)
             }
 
             CommandGroup(after: .windowArrangement) {
@@ -67,4 +74,5 @@ extension Notification.Name {
     static let toggleMaximize = Notification.Name("toggleMaximize")
     static let focusPreviousPane = Notification.Name("focusPreviousPane")
     static let focusNextPane = Notification.Name("focusNextPane")
+    static let closePane = Notification.Name("closePane")
 }

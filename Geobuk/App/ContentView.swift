@@ -11,7 +11,6 @@ struct ContentView: View {
         Group {
             if isInitialized {
                 if splitManager.isMaximized, let focusedId = splitManager.focusedPaneId {
-                    // 최대화 모드: 포커스된 패널만 표시
                     SplitPaneView(
                         content: splitManager.root.allLeaves().first(where: { $0.id == focusedId })
                             ?? splitManager.root.allLeaves()[0],
@@ -25,6 +24,7 @@ struct ContentView: View {
                         focusedPaneId: splitManager.focusedPaneId,
                         onFocusPane: { id in
                             splitManager.setFocusedPane(id: id)
+                            focusSurfaceView(id: id)
                         },
                         surfaceViewProvider: { id in
                             surfaceViews[id]
@@ -61,9 +61,14 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .focusPreviousPane)) { _ in
             splitManager.focusPreviousPane()
+            if let id = splitManager.focusedPaneId { focusSurfaceView(id: id) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .focusNextPane)) { _ in
             splitManager.focusNextPane()
+            if let id = splitManager.focusedPaneId { focusSurfaceView(id: id) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .closePane)) { _ in
+            closeFocusedPane()
         }
         .onDisappear {
             for surfaceView in surfaceViews.values {
@@ -80,11 +85,15 @@ struct ContentView: View {
     private func initializeTerminal() async {
         do {
             try ghosttyApp.create()
-            // 초기 패널용 surface 생성
             let initialPaneId = splitManager.focusedPaneId!
             let surfaceView = GhosttySurfaceView(app: ghosttyApp)
             surfaceViews[initialPaneId] = surfaceView
             isInitialized = true
+
+            // 초기 패널에 포커스
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusSurfaceView(id: initialPaneId)
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -98,12 +107,54 @@ struct ContentView: View {
 
         splitManager.splitFocusedPane(direction: direction)
 
-        // 새 패널용 surface 생성
         if let newPaneId = splitManager.focusedPaneId,
            surfaceViews[newPaneId] == nil {
             let surfaceView = GhosttySurfaceView(app: ghosttyApp)
             surfaceViews[newPaneId] = surfaceView
+
+            // 새 패널에 자동 포커스 (뷰 계층에 추가된 후)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusSurfaceView(id: newPaneId)
+            }
         }
+    }
+
+    // MARK: - Close Operations
+
+    @MainActor
+    private func closeFocusedPane() {
+        guard isInitialized else { return }
+
+        // 패널이 1개면 앱 종료
+        if splitManager.paneCount <= 1 {
+            NSApplication.shared.terminate(nil)
+            return
+        }
+
+        // 닫을 패널의 surface 정리
+        if let closingId = splitManager.focusedPaneId {
+            splitManager.closeFocusedPane()
+
+            // surface 해제
+            if let surfaceView = surfaceViews.removeValue(forKey: closingId) {
+                surfaceView.close()
+            }
+
+            // 남은 패널에 포커스
+            if let newFocusId = splitManager.focusedPaneId {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    focusSurfaceView(id: newFocusId)
+                }
+            }
+        }
+    }
+
+    // MARK: - Focus
+
+    @MainActor
+    private func focusSurfaceView(id: UUID) {
+        guard let surfaceView = surfaceViews[id] else { return }
+        surfaceView.window?.makeFirstResponder(surfaceView)
     }
 }
 
