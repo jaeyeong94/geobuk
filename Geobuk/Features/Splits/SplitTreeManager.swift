@@ -124,6 +124,14 @@ final class SplitTreeManager {
         focusedPaneId = leaves[prevIndex].id
     }
 
+    /// 방향 기반 패널 이동 (공간 탐색)
+    func focusPane(direction: NavigationDirection) {
+        guard let currentId = focusedPaneId else { return }
+        if let neighborId = root.neighborInDirection(from: currentId, direction: direction) {
+            focusedPaneId = neighborId
+        }
+    }
+
     /// 특정 패널에 포커스 설정
     func setFocusedPane(id: UUID) {
         // 해당 ID의 leaf가 존재하는지 확인

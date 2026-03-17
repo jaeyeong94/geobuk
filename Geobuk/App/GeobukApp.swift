@@ -43,23 +43,23 @@ struct GeobukApp: App {
 
                 Divider()
 
-                Button("Focus Previous Pane") {
-                    NotificationCenter.default.post(name: .focusPreviousPane, object: nil)
+                Button("Focus Left Pane") {
+                    NotificationCenter.default.post(name: .focusPaneDirection, object: NavigationDirection.left)
                 }
                 .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
 
-                Button("Focus Next Pane") {
-                    NotificationCenter.default.post(name: .focusNextPane, object: nil)
+                Button("Focus Right Pane") {
+                    NotificationCenter.default.post(name: .focusPaneDirection, object: NavigationDirection.right)
                 }
                 .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
 
                 Button("Focus Pane Above") {
-                    NotificationCenter.default.post(name: .focusPreviousPane, object: nil)
+                    NotificationCenter.default.post(name: .focusPaneDirection, object: NavigationDirection.up)
                 }
                 .keyboardShortcut(.upArrow, modifiers: [.command, .option])
 
                 Button("Focus Pane Below") {
-                    NotificationCenter.default.post(name: .focusNextPane, object: nil)
+                    NotificationCenter.default.post(name: .focusPaneDirection, object: NavigationDirection.down)
                 }
                 .keyboardShortcut(.downArrow, modifiers: [.command, .option])
             }
@@ -72,7 +72,6 @@ extension Notification.Name {
     static let splitHorizontally = Notification.Name("splitHorizontally")
     static let splitVertically = Notification.Name("splitVertically")
     static let toggleMaximize = Notification.Name("toggleMaximize")
-    static let focusPreviousPane = Notification.Name("focusPreviousPane")
-    static let focusNextPane = Notification.Name("focusNextPane")
+    static let focusPaneDirection = Notification.Name("focusPaneDirection")
     static let closePane = Notification.Name("closePane")
 }

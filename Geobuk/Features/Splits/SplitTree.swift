@@ -27,6 +27,11 @@ enum PaneContent: Identifiable, Sendable {
 
 // MARK: - Split Direction
 
+/// 패널 이동 방향
+enum NavigationDirection {
+    case left, right, up, down
+}
+
 /// 분할 방향
 enum SplitDirection: Sendable {
     case horizontal  // 좌우 나란히
@@ -228,6 +233,66 @@ indirect enum SplitNode: Identifiable, Sendable {
             return 1
         case .split(let container):
             return container.first.leafCount + container.second.leafCount
+        }
+    }
+
+    // MARK: - 방향 기반 탐색
+
+    /// 주어진 방향으로 이동할 때 도달하는 leaf의 ID 반환
+    /// - left/up: 같은 방향 split에서 first(왼쪽/위) 서브트리의 마지막 leaf
+    /// - right/down: 같은 방향 split에서 second(오른쪽/아래) 서브트리의 첫 leaf
+    func neighborInDirection(from leafId: UUID, direction: NavigationDirection) -> UUID? {
+        let path = pathTo(leafId: leafId)
+        guard !path.isEmpty else { return nil }
+
+        // 경로를 역순으로 탐색: 해당 방향과 매칭되는 split 찾기
+        for i in stride(from: path.count - 1, through: 0, by: -1) {
+            let (container, isInFirst) = path[i]
+
+            let splitDirection = container.direction
+            let matchesDirection: Bool = switch direction {
+            case .left:  splitDirection == .horizontal && !isInFirst
+            case .right: splitDirection == .horizontal && isInFirst
+            case .up:    splitDirection == .vertical && !isInFirst
+            case .down:  splitDirection == .vertical && isInFirst
+            }
+
+            if matchesDirection {
+                // 반대쪽 서브트리에서 적절한 leaf 선택
+                let targetSubtree = isInFirst ? container.second : container.first
+                switch direction {
+                case .left, .up:
+                    return targetSubtree.allLeaves().last?.id
+                case .right, .down:
+                    return targetSubtree.allLeaves().first?.id
+                }
+            }
+        }
+
+        return nil
+    }
+
+    /// 루트에서 leafId까지의 경로: [(컨테이너, leaf가 first에 있는지)]
+    private func pathTo(leafId: UUID) -> [(container: SplitContainer, isInFirst: Bool)] {
+        switch self {
+        case .leaf(let content):
+            return content.id == leafId ? [] : []
+        case .split(let container):
+            if container.first.containsLeaf(id: leafId) {
+                return [(container, true)] + container.first.pathTo(leafId: leafId)
+            } else if container.second.containsLeaf(id: leafId) {
+                return [(container, false)] + container.second.pathTo(leafId: leafId)
+            }
+            return []
+        }
+    }
+
+    /// leaf ID가 이 서브트리에 존재하는지
+    private func containsLeaf(id: UUID) -> Bool {
+        switch self {
+        case .leaf(let content): return content.id == id
+        case .split(let container):
+            return container.first.containsLeaf(id: id) || container.second.containsLeaf(id: id)
         }
     }
 

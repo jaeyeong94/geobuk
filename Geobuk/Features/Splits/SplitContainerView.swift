@@ -19,8 +19,9 @@ struct SplitContainerView: View {
 
         case .split(let container):
             SplitDividerView(
+                containerId: container.id,
                 direction: container.direction,
-                ratio: container.ratio,
+                modelRatio: container.ratio,
                 first: {
                     SplitContainerView(
                         node: container.first,
@@ -44,7 +45,6 @@ struct SplitContainerView: View {
 
 // MARK: - Pane View
 
-/// 단일 패널 뷰
 struct SplitPaneView: View {
     let content: PaneContent
     let isFocused: Bool
@@ -82,9 +82,10 @@ struct SplitPaneView: View {
 
 // MARK: - Divider View
 
-/// GeometryReader 기반 분할 뷰 (드래그 핸들 포함)
 struct SplitDividerView<First: View, Second: View>: View {
+    let containerId: UUID
     let direction: SplitDirection
+    let modelRatio: CGFloat
     @State private var ratio: CGFloat
     let first: () -> First
     let second: () -> Second
@@ -94,13 +95,16 @@ struct SplitDividerView<First: View, Second: View>: View {
     private let maxRatio: CGFloat = 0.9
 
     init(
+        containerId: UUID,
         direction: SplitDirection,
-        ratio: CGFloat,
+        modelRatio: CGFloat,
         @ViewBuilder first: @escaping () -> First,
         @ViewBuilder second: @escaping () -> Second
     ) {
+        self.containerId = containerId
         self.direction = direction
-        self._ratio = State(initialValue: ratio)
+        self.modelRatio = modelRatio
+        self._ratio = State(initialValue: modelRatio)
         self.first = first
         self.second = second
     }
@@ -131,6 +135,10 @@ struct SplitDividerView<First: View, Second: View>: View {
                 }
             }
         }
+        // 모델 ratio가 변경되면 (equalized 등) @State도 동기화
+        .onChange(of: modelRatio) { _, newValue in
+            ratio = newValue
+        }
     }
 
     @ViewBuilder
@@ -154,7 +162,10 @@ struct SplitDividerView<First: View, Second: View>: View {
             )
             .onHover { isHovered in
                 if isHovered {
-                    NSCursor.resizeLeftRight.push()
+                    let cursor: NSCursor = direction == .horizontal
+                        ? .resizeLeftRight
+                        : .resizeUpDown
+                    cursor.push()
                 } else {
                     NSCursor.pop()
                 }

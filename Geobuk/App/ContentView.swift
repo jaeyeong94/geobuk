@@ -59,13 +59,11 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .toggleMaximize)) { _ in
             splitManager.toggleMaximize()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .focusPreviousPane)) { _ in
-            splitManager.focusPreviousPane()
-            if let id = splitManager.focusedPaneId { focusSurfaceView(id: id) }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .focusNextPane)) { _ in
-            splitManager.focusNextPane()
-            if let id = splitManager.focusedPaneId { focusSurfaceView(id: id) }
+        .onReceive(NotificationCenter.default.publisher(for: .focusPaneDirection)) { notification in
+            if let direction = notification.object as? NavigationDirection {
+                splitManager.focusPane(direction: direction)
+                if let id = splitManager.focusedPaneId { focusSurfaceView(id: id) }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .closePane)) { _ in
             closeFocusedPane()
