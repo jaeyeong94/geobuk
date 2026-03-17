@@ -295,6 +295,58 @@ struct SplitTreeManagerTests {
         #expect(manager.canRedo)
     }
 
+    // MARK: - 최대화
+
+    @Test("toggleMaximize_복수패널_최대화토글")
+    func toggleMaximize_multiplePanes_toggles() {
+        let manager = SplitTreeManager()
+        manager.splitFocusedPane(direction: .horizontal)
+
+        #expect(!manager.isMaximized)
+        manager.toggleMaximize()
+        #expect(manager.isMaximized)
+        manager.toggleMaximize()
+        #expect(!manager.isMaximized)
+    }
+
+    @Test("toggleMaximize_단일패널_토글안됨")
+    func toggleMaximize_singlePane_doesNotToggle() {
+        let manager = SplitTreeManager()
+        manager.toggleMaximize()
+        #expect(!manager.isMaximized)
+    }
+
+    @Test("toggleMaximize_패널닫아하나남으면_최대화해제")
+    func toggleMaximize_closePaneToOne_resetsMaximize() {
+        let manager = SplitTreeManager()
+        manager.splitFocusedPane(direction: .horizontal)
+        manager.toggleMaximize()
+        #expect(manager.isMaximized)
+
+        manager.closeFocusedPane()
+        #expect(!manager.isMaximized)
+    }
+
+    // MARK: - 균등 분할
+
+    @Test("splitFocused_연속분할_균등비율적용")
+    func splitFocused_consecutiveSplits_equalizedRatios() {
+        let manager = SplitTreeManager()
+        manager.splitFocusedPane(direction: .horizontal)
+
+        // 첫 번째 분할 후: 2패널 -> ratio = 0.5
+        if case .split(let c) = manager.root {
+            #expect(c.ratio == 0.5)
+        }
+
+        // 두 번째 패널 포커스 상태에서 다시 분할
+        manager.splitFocusedPane(direction: .horizontal)
+        // 3패널: 루트는 첫번째(1) : 두번째컨테이너(2) -> ratio = 1/3
+        // 내부 컨테이너: 1:1 -> ratio = 0.5
+        let leaves = manager.root.allLeaves()
+        #expect(leaves.count == 3)
+    }
+
     // MARK: - paneCount
 
     @Test("paneCount_초기_1")

@@ -197,6 +197,40 @@ indirect enum SplitNode: Identifiable, Sendable {
         }
     }
 
+    // MARK: - 균등 비율
+
+    /// 트리 내 모든 leaf의 크기가 동일해지도록 비율 재계산
+    /// 각 split 노드에서 ratio = (왼쪽 leaf 수) / (전체 leaf 수)
+    func equalized() -> SplitNode {
+        switch self {
+        case .leaf:
+            return self
+        case .split(let container):
+            let equalizedFirst = container.first.equalized()
+            let equalizedSecond = container.second.equalized()
+            let leftCount = CGFloat(equalizedFirst.leafCount)
+            let totalCount = leftCount + CGFloat(equalizedSecond.leafCount)
+            let newRatio = leftCount / totalCount
+            return .split(SplitContainer(
+                id: container.id,
+                direction: container.direction,
+                ratio: newRatio,
+                first: equalizedFirst,
+                second: equalizedSecond
+            ))
+        }
+    }
+
+    /// leaf 노드 수
+    var leafCount: Int {
+        switch self {
+        case .leaf:
+            return 1
+        case .split(let container):
+            return container.first.leafCount + container.second.leafCount
+        }
+    }
+
     // MARK: - 리사이즈 연산
 
     /// 특정 컨테이너의 비율 변경

@@ -10,16 +10,27 @@ struct ContentView: View {
     var body: some View {
         Group {
             if isInitialized {
-                SplitContainerView(
-                    node: splitManager.root,
-                    focusedPaneId: splitManager.focusedPaneId,
-                    onFocusPane: { id in
-                        splitManager.setFocusedPane(id: id)
-                    },
-                    surfaceViewProvider: { id in
-                        surfaceViews[id]
-                    }
-                )
+                if splitManager.isMaximized, let focusedId = splitManager.focusedPaneId {
+                    // 최대화 모드: 포커스된 패널만 표시
+                    SplitPaneView(
+                        content: splitManager.root.allLeaves().first(where: { $0.id == focusedId })
+                            ?? splitManager.root.allLeaves()[0],
+                        isFocused: true,
+                        onTap: {},
+                        surfaceViewProvider: { id in surfaceViews[id] }
+                    )
+                } else {
+                    SplitContainerView(
+                        node: splitManager.root,
+                        focusedPaneId: splitManager.focusedPaneId,
+                        onFocusPane: { id in
+                            splitManager.setFocusedPane(id: id)
+                        },
+                        surfaceViewProvider: { id in
+                            surfaceViews[id]
+                        }
+                    )
+                }
             } else if let errorMessage {
                 VStack(spacing: 12) {
                     Text("Terminal Error")
@@ -44,6 +55,15 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .splitVertically)) { _ in
             splitFocusedPane(direction: .vertical)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleMaximize)) { _ in
+            splitManager.toggleMaximize()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusPreviousPane)) { _ in
+            splitManager.focusPreviousPane()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusNextPane)) { _ in
+            splitManager.focusNextPane()
         }
         .onDisappear {
             for surfaceView in surfaceViews.values {

@@ -27,6 +27,25 @@ struct GeobukApp: App {
                 }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
             }
+
+            CommandGroup(after: .windowArrangement) {
+                Button("Toggle Maximize") {
+                    NotificationCenter.default.post(name: .toggleMaximize, object: nil)
+                }
+                .keyboardShortcut(.return, modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("Focus Previous Pane") {
+                    NotificationCenter.default.post(name: .focusPreviousPane, object: nil)
+                }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+
+                Button("Focus Next Pane") {
+                    NotificationCenter.default.post(name: .focusNextPane, object: nil)
+                }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+            }
         }
     }
 }
@@ -35,4 +54,7 @@ extension Notification.Name {
     static let newTerminalTab = Notification.Name("newTerminalTab")
     static let splitHorizontally = Notification.Name("splitHorizontally")
     static let splitVertically = Notification.Name("splitVertically")
+    static let toggleMaximize = Notification.Name("toggleMaximize")
+    static let focusPreviousPane = Notification.Name("focusPreviousPane")
+    static let focusNextPane = Notification.Name("focusNextPane")
 }

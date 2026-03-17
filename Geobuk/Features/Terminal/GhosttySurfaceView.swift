@@ -117,6 +117,14 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
 
     // MARK: - Keyboard Input
 
+    /// NSResponder 기본 동작 방지 (화살표 키, Delete 등)
+    /// interpretKeyEvents가 moveUp:, moveDown: 등의 셀렉터를 호출할 때
+    /// 기본 NSView 동작 대신 ghostty_surface_key로 처리되도록 빈 구현
+    override func doCommand(by selector: Selector) {
+        // Intentionally empty — prevents NSResponder default handling
+        // Arrow keys, delete, etc. are handled via ghostty_surface_key
+    }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         // Command 키 조합은 항상 메뉴 시스템으로 전달
         // (Cmd+D → Split, Cmd+T → New Tab, Cmd+W → Close 등)

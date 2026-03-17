@@ -474,6 +474,167 @@ struct SplitTreeTests {
         }
     }
 
+    // MARK: - 균등 비율 테스트
+
+    @Suite("SplitNode - 균등 비율")
+    struct SplitNodeEqualizeTests {
+
+        @Test("equalized_leaf_변경없음")
+        func equalized_leaf_unchanged() {
+            let pane = TerminalPane(id: UUID())
+            let node = SplitNode.leaf(.terminal(pane))
+            let result = node.equalized()
+            #expect(result.id == pane.id)
+            #expect(result.isLeaf)
+        }
+
+        @Test("equalized_두패널_비율0점5")
+        func equalized_twoPanes_ratioHalf() {
+            let pane1 = TerminalPane(id: UUID())
+            let pane2 = TerminalPane(id: UUID())
+            let container = SplitContainer(
+                id: UUID(),
+                direction: .horizontal,
+                ratio: 0.7,
+                first: .leaf(.terminal(pane1)),
+                second: .leaf(.terminal(pane2))
+            )
+            let node = SplitNode.split(container)
+            let result = node.equalized()
+            if case .split(let c) = result {
+                #expect(c.ratio == 0.5)
+            } else {
+                Issue.record("Expected split node")
+            }
+        }
+
+        @Test("equalized_세패널_균등비율")
+        func equalized_threePanes_equalRatios() {
+            // 구조: (pane1 | pane2) / pane3
+            let pane1 = TerminalPane(id: UUID())
+            let pane2 = TerminalPane(id: UUID())
+            let pane3 = TerminalPane(id: UUID())
+            let inner = SplitContainer(
+                id: UUID(),
+                direction: .horizontal,
+                ratio: 0.3, // 불균등한 비율
+                first: .leaf(.terminal(pane1)),
+                second: .leaf(.terminal(pane2))
+            )
+            let root = SplitNode.split(SplitContainer(
+                id: UUID(),
+                direction: .vertical,
+                ratio: 0.7, // 불균등한 비율
+                first: .split(inner),
+                second: .leaf(.terminal(pane3))
+            ))
+            let result = root.equalized()
+            // 루트: 왼쪽 2개, 오른쪽 1개 -> ratio = 2/3
+            if case .split(let c) = result {
+                #expect(abs(c.ratio - 2.0 / 3.0) < 0.001)
+                // 내부: 1:1 -> ratio = 0.5
+                if case .split(let inner) = c.first {
+                    #expect(inner.ratio == 0.5)
+                } else {
+                    Issue.record("Expected inner split")
+                }
+            } else {
+                Issue.record("Expected split node")
+            }
+        }
+
+        @Test("equalized_네패널_균등비율")
+        func equalized_fourPanes_equalRatios() {
+            // 구조: (pane1 | pane2) / (pane3 | pane4)
+            let pane1 = TerminalPane(id: UUID())
+            let pane2 = TerminalPane(id: UUID())
+            let pane3 = TerminalPane(id: UUID())
+            let pane4 = TerminalPane(id: UUID())
+            let left = SplitContainer(
+                id: UUID(),
+                direction: .horizontal,
+                ratio: 0.3,
+                first: .leaf(.terminal(pane1)),
+                second: .leaf(.terminal(pane2))
+            )
+            let right = SplitContainer(
+                id: UUID(),
+                direction: .horizontal,
+                ratio: 0.8,
+                first: .leaf(.terminal(pane3)),
+                second: .leaf(.terminal(pane4))
+            )
+            let root = SplitNode.split(SplitContainer(
+                id: UUID(),
+                direction: .vertical,
+                ratio: 0.7,
+                first: .split(left),
+                second: .split(right)
+            ))
+            let result = root.equalized()
+            if case .split(let c) = result {
+                // 루트: 2:2 -> ratio = 0.5
+                #expect(c.ratio == 0.5)
+                // 양쪽 내부: 1:1 -> ratio = 0.5
+                if case .split(let l) = c.first {
+                    #expect(l.ratio == 0.5)
+                }
+                if case .split(let r) = c.second {
+                    #expect(r.ratio == 0.5)
+                }
+            } else {
+                Issue.record("Expected split node")
+            }
+        }
+
+        @Test("leafCount_leaf_1반환")
+        func leafCount_leaf_returnsOne() {
+            let node = SplitNode.leaf(.terminal(TerminalPane(id: UUID())))
+            #expect(node.leafCount == 1)
+        }
+
+        @Test("leafCount_이진트리_올바른개수")
+        func leafCount_binaryTree_correctCount() {
+            let pane1 = TerminalPane(id: UUID())
+            let pane2 = TerminalPane(id: UUID())
+            let pane3 = TerminalPane(id: UUID())
+            let inner = SplitContainer(
+                id: UUID(),
+                direction: .horizontal,
+                ratio: 0.5,
+                first: .leaf(.terminal(pane1)),
+                second: .leaf(.terminal(pane2))
+            )
+            let root = SplitNode.split(SplitContainer(
+                id: UUID(),
+                direction: .vertical,
+                ratio: 0.5,
+                first: .split(inner),
+                second: .leaf(.terminal(pane3))
+            ))
+            #expect(root.leafCount == 3)
+        }
+
+        @Test("equalized_방향보존")
+        func equalized_preservesDirection() {
+            let pane1 = TerminalPane(id: UUID())
+            let pane2 = TerminalPane(id: UUID())
+            let container = SplitContainer(
+                id: UUID(),
+                direction: .vertical,
+                ratio: 0.3,
+                first: .leaf(.terminal(pane1)),
+                second: .leaf(.terminal(pane2))
+            )
+            let result = SplitNode.split(container).equalized()
+            if case .split(let c) = result {
+                #expect(c.direction == .vertical)
+            } else {
+                Issue.record("Expected split node")
+            }
+        }
+    }
+
     // MARK: - 경계값 테스트
 
     @Suite("SplitNode - 경계값")

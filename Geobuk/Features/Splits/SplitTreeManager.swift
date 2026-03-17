@@ -15,6 +15,9 @@ final class SplitTreeManager {
     /// 현재 포커스된 패널 ID
     private(set) var focusedPaneId: UUID?
 
+    /// 현재 포커스된 패널이 최대화 상태인지 여부
+    private(set) var isMaximized = false
+
     // MARK: - Undo/Redo
 
     /// 스냅샷: (트리 루트, 포커스 ID)
@@ -71,7 +74,7 @@ final class SplitTreeManager {
         ) else { return }
 
         saveSnapshot()
-        root = newRoot
+        root = newRoot.equalized()
         focusedPaneId = newPane.id
     }
 
@@ -92,6 +95,10 @@ final class SplitTreeManager {
             // 포커스를 남은 패널 중 첫 번째로 이동
             let leaves = newRoot.allLeaves()
             focusedPaneId = leaves.first?.id
+            // 패널이 하나만 남으면 최대화 해제
+            if leaves.count <= 1 {
+                isMaximized = false
+            }
         case .unchanged:
             break
         }
@@ -123,6 +130,15 @@ final class SplitTreeManager {
         let leaves = root.allLeaves()
         guard leaves.contains(where: { $0.id == id }) else { return }
         focusedPaneId = id
+    }
+
+    // MARK: - Maximize
+
+    /// 포커스된 패널 최대화/복원 토글
+    func toggleMaximize() {
+        // 패널이 하나뿐이면 최대화할 필요 없음
+        guard paneCount > 1 else { return }
+        isMaximized.toggle()
     }
 
     // MARK: - Resize
