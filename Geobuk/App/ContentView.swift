@@ -76,7 +76,6 @@ struct ContentView: View {
     private func splitFocusedPane(direction: SplitDirection) {
         guard isInitialized else { return }
 
-        // 분할 전 포커스 ID 기억
         splitManager.splitFocusedPane(direction: direction)
 
         // 새 패널용 surface 생성

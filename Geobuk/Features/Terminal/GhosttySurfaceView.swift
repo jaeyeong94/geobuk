@@ -117,6 +117,15 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
 
     // MARK: - Keyboard Input
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Command 키 조합은 항상 메뉴 시스템으로 전달
+        // (Cmd+D → Split, Cmd+T → New Tab, Cmd+W → Close 등)
+        if event.modifierFlags.contains(.command) {
+            return super.performKeyEquivalent(with: event)
+        }
+        return false
+    }
+
     override func keyDown(with event: NSEvent) {
         keyTextAccumulator = []
         interpretKeyEvents([event])
