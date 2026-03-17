@@ -25,7 +25,9 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         self.ghosttyApp = app
         super.init(frame: .zero)
 
-        wantsLayer = true
+        // wantsLayer를 설정하지 않음 — libghostty가 자체 CAMetalLayer를 관리
+        // wantsLayer = true 를 설정하면 기본 CALayer가 생성되어
+        // Metal 렌더링과 충돌하고 리사이즈 시 잔상이 남음
 
         guard let appHandle = app.appHandle else { return }
 
@@ -86,20 +88,35 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        sizeDidChange(newSize)
+        notifySurfaceOfSize(newSize)
+    }
+
+    override func layout() {
+        super.layout()
+        notifySurfaceOfSize(bounds.size)
     }
 
     // MARK: - Size & Scale
 
-    /// 뷰 크기 변경 시 surface에 전달
-    func sizeDidChange(_ size: CGSize) {
+    /// 뷰 크기 변경 시 surface에 전달 (중복 호출 방지)
+    private var lastNotifiedSize: CGSize = .zero
+
+    private func notifySurfaceOfSize(_ size: CGSize) {
         guard let surface else { return }
+        guard size.width > 0 && size.height > 0 else { return }
         let backingSize = convertToBacking(size)
+        guard backingSize != lastNotifiedSize else { return }
+        lastNotifiedSize = backingSize
         ghostty_surface_set_size(
             surface,
             UInt32(backingSize.width),
             UInt32(backingSize.height)
         )
+    }
+
+    /// 외부에서 호출되는 크기 변경 (SwiftUI GeometryReader 등)
+    func sizeDidChange(_ size: CGSize) {
+        notifySurfaceOfSize(size)
     }
 
     /// 포커스 상태 변경
