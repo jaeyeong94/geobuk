@@ -1,5 +1,11 @@
 import Foundation
 
+/// PTY 에러
+enum PTYError: Error, Sendable {
+    case forkFailed
+    case alreadyActive
+}
+
 /// PTY (Pseudo Terminal) 제어기
 /// forkpty() + DispatchIO 기반 비동기 I/O
 ///
@@ -40,18 +46,79 @@ final class PTYController: @unchecked Sendable {
         environment: [String: String] = [:],
         onRead: @escaping @Sendable (Data) -> Void
     ) throws {
-        // Phase 1에서 구현:
-        // 1. forkpty(&masterFd, nil, nil, nil) → childPid
-        // 2. 자식 프로세스에서 execvp(shell, args)
-        // 3. 부모에서 DispatchIO 채널 생성
-        // 4. 비동기 읽기 루프 시작
+        guard !isActive else { throw PTYError.alreadyActive }
+
+        var winSize = winsize(ws_row: 24, ws_col: 80, ws_xpixel: 0, ws_ypixel: 0)
+
+        let pid = forkpty(&masterFd, nil, nil, &winSize)
+        guard pid >= 0 else { throw PTYError.forkFailed }
+
+        if pid == 0 {
+            // Child process
+            let shellPath = shell ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+
+            // 작업 디렉토리 변경
+            if chdir(cwd) != 0 {
+                // chdir 실패 시 홈 디렉토리 사용
+                _ = chdir(NSHomeDirectory())
+            }
+
+            // 환경변수 설정
+            for (key, value) in environment {
+                setenv(key, value, 1)
+            }
+            setenv("TERM", "xterm-256color", 1)
+
+            // 셸 실행
+            let shellName = (shellPath as NSString).lastPathComponent
+            let loginShellName = "-\(shellName)"
+
+            loginShellName.withCString { namePtr in
+                shellPath.withCString { pathPtr in
+                    // execvp에 전달할 인자 배열
+                    let args: [UnsafeMutablePointer<CChar>?] = [
+                        UnsafeMutablePointer(mutating: namePtr),
+                        nil
+                    ]
+                    execvp(pathPtr, args)
+                }
+            }
+
+            // execvp가 실패하면 여기에 도달
+            _exit(1)
+        }
+
+        // Parent process
+        childPid = pid
+
+        // DispatchIO 채널 생성
+        let channel = DispatchIO(type: .stream, fileDescriptor: masterFd, queue: readQueue) { [weak self] _ in
+            // Cleanup handler - fd는 close()에서 관리
+            _ = self
+        }
+        dispatchChannel = channel
+
+        // 비동기 읽기 시작
+        channel.read(offset: 0, length: .max, queue: readQueue) { done, data, error in
+            if let data, !data.isEmpty {
+                let bytes = Data(data)
+                onRead(bytes)
+            }
+            if done && error != 0 {
+                // Read 완료 또는 에러 - 정리는 close()에서 처리
+            }
+        }
+
         isActive = true
     }
 
     /// PTY에 데이터 쓰기
     func write(_ data: Data) {
         guard isActive, masterFd >= 0 else { return }
-        // DispatchIO write
+        data.withUnsafeBytes { ptr in
+            guard let baseAddress = ptr.baseAddress else { return }
+            _ = Darwin.write(masterFd, baseAddress, ptr.count)
+        }
     }
 
     /// 특수 키 전송 (Ctrl+C, Ctrl+D 등)
