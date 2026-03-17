@@ -1,0 +1,104 @@
+name: Geobuk
+options:
+  bundleIdPrefix: com.geobuk
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: false
+
+targets:
+  Geobuk:
+    type: application
+    platform: macOS
+    sources:
+      - path: Geobuk
+        excludes:
+          - "**/*.entitlements"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.geobuk.app
+        INFOPLIST_FILE: Geobuk/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Geobuk/Resources/Geobuk.entitlements
+        ENABLE_APP_SANDBOX: false
+        SWIFT_OBJC_BRIDGING_HEADER: Geobuk/Geobuk-Bridging-Header.h
+        LIBRARY_SEARCH_PATHS:
+          - "$(PROJECT_DIR)/build/lib"
+          - "$(PROJECT_DIR)/Vendor/ghostty/zig-out/lib"
+        HEADER_SEARCH_PATHS:
+          - "$(PROJECT_DIR)/Vendor/ghostty/include"
+          - "$(PROJECT_DIR)/build/include"
+        OTHER_LDFLAGS:
+          - "-lghostty"
+          - "-lz"
+          - "-lc++"
+        GENERATE_INFOPLIST_FILE: false
+        SWIFT_STRICT_CONCURRENCY: complete
+    dependencies:
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: CoreText.framework
+      - sdk: QuartzCore.framework
+      - sdk: WebKit.framework
+      - sdk: Carbon.framework
+      - sdk: CoreGraphics.framework
+      - sdk: CoreFoundation.framework
+      - sdk: IOKit.framework
+      - sdk: libz.tbd
+    preBuildScripts:
+      - name: "Build libghostty"
+        script: |
+          if [ "$ACTION" = "clean" ]; then
+            rm -rf "$PROJECT_DIR/build"
+            exit 0
+          fi
+          if [ -f "$PROJECT_DIR/build/lib/libghostty.a" ]; then
+            echo "libghostty.a already built, skipping..."
+            exit 0
+          fi
+          "$PROJECT_DIR/Scripts/build-libghostty.sh"
+        basedOnDependencyAnalysis: false
+
+  GeobukTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: GeobukTests
+    dependencies:
+      - target: Geobuk
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.geobuk.tests
+
+  GeobukUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: GeobukUITests
+    dependencies:
+      - target: Geobuk
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.geobuk.uitests
+
+schemes:
+  Geobuk:
+    build:
+      targets:
+        Geobuk: all
+        GeobukTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - GeobukTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
