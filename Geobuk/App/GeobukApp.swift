@@ -37,7 +37,7 @@ struct GeobukApp: App {
                 Button("Close Workspace") {
                     NotificationCenter.default.post(name: .closeWorkspace, object: nil)
                 }
-                .keyboardShortcut("w", modifiers: [.command, .shift])
+                .keyboardShortcut("w", modifiers: [.command, .option])
             }
 
             CommandGroup(after: .windowArrangement) {

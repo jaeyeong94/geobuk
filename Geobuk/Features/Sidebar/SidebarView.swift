@@ -3,6 +3,7 @@ import SwiftUI
 /// 워크스페이스 목록을 표시하는 사이드바 뷰
 struct SidebarView: View {
     @Bindable var workspaceManager: WorkspaceManager
+    var onWorkspaceSwitch: (() -> Void)?
     @State private var editingIndex: Int? = nil
     @State private var editingName: String = ""
 
@@ -45,6 +46,7 @@ struct SidebarView: View {
                             editingName: $editingName,
                             onSelect: {
                                 workspaceManager.switchToWorkspace(at: index)
+                                onWorkspaceSwitch?()
                             },
                             onBeginRename: {
                                 editingName = workspace.name
@@ -87,6 +89,8 @@ struct WorkspaceTabView: View {
     let onCancelRename: () -> Void
     let onClose: () -> Void
 
+    @FocusState private var isTextFieldFocused: Bool
+
     var body: some View {
         HStack(spacing: 6) {
             // 숫자 인덱스
@@ -100,7 +104,9 @@ struct WorkspaceTabView: View {
                     TextField("Name", text: $editingName, onCommit: onCommitRename)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12, weight: .medium))
+                        .focused($isTextFieldFocused)
                         .onExitCommand(perform: onCancelRename)
+                        .onAppear { isTextFieldFocused = true }
                 } else {
                     Text(workspace.name)
                         .font(.system(size: 12, weight: isActive ? .semibold : .regular))

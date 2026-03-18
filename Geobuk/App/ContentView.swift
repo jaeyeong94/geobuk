@@ -16,7 +16,9 @@ struct ContentView: View {
             if isInitialized {
                 HStack(spacing: 0) {
                     if isSidebarVisible {
-                        SidebarView(workspaceManager: workspaceManager)
+                        SidebarView(workspaceManager: workspaceManager) {
+                            ensureSurfaceForActiveWorkspace()
+                        }
                         Divider()
                     }
 
