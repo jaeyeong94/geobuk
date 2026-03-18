@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var paddingY: Double = 4
     @State private var lineHeight: Double = 1.0
     @State private var processMonitor = PaneProcessMonitor()
+    @State private var claudeLaunchSettings = ClaudeLaunchSettings()
 
     var body: some View {
         Group {
@@ -103,6 +104,7 @@ struct ContentView: View {
                 paddingX: $paddingX,
                 paddingY: $paddingY,
                 lineHeight: $lineHeight,
+                claudeSettings: claudeLaunchSettings,
                 onFontSizeChange: { newSize in
                     setFontSizeForAllSurfaces(newSize)
                 },
@@ -373,7 +375,7 @@ struct ContentView: View {
             // PTY 로그 파일을 통한 모니터링 시작
             claudeMonitor.monitor(surfaceViewId: surfaceView.viewId)
 
-            let command = "claude --output-format stream-json"
+            let command = claudeLaunchSettings.buildCommand()
             surfaceView.sendText(command + "\r")
         }
     }

@@ -170,23 +170,96 @@ struct SidebarView: View {
             .padding(.vertical, 6)
 
             ForEach(watcher.activeSessions) { session in
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 6, height: 6)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("PID \(session.pid)")
-                            .font(.system(size: 10, weight: .medium))
-                        Text(abbreviatedPath(session.cwd))
-                            .font(.system(size: 9))
-                            .foregroundColor(.secondary)
-                    }
+                fileWatcherSessionRow(session: session)
+            }
+
+            // 전체 비용 합계 (claudeMonitor에서 가져옴)
+            if let monitor = claudeMonitor, monitor.sessionState.costUSD > 0 {
+                HStack {
                     Spacer()
+                    Text(String(format: "Total: $%.2f", monitor.sessionState.costUSD))
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 3)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
             }
         }
+    }
+
+    @ViewBuilder
+    private func fileWatcherSessionRow(session: ClaudeFileSession) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(sessionStatusColor(for: session))
+                .frame(width: 6, height: 6)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text("Session \(session.pid)")
+                        .font(.system(size: 10, weight: .medium))
+                    Text(abbreviatedPath(session.cwd))
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                // 세션 상태 표시 (claudeMonitor의 상태를 활용)
+                if let monitor = claudeMonitor, monitor.sessionState.phase != .idle {
+                    HStack(spacing: 4) {
+                        Text(sessionStatusText(monitor: monitor))
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
+                        if monitor.sessionState.tokenUsage.totalTokens > 0 {
+                            Text(formatTokenCount(monitor.sessionState.tokenUsage.totalTokens))
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 3)
+    }
+
+    /// 세션 상태에 따른 색상
+    private func sessionStatusColor(for session: ClaudeFileSession) -> Color {
+        guard let monitor = claudeMonitor else { return .green }
+        switch monitor.sessionState.phase {
+        case .responding: return .green
+        case .toolExecuting: return .blue
+        case .waitingForInput: return .yellow
+        case .sessionComplete: return .gray
+        default: return .green
+        }
+    }
+
+    /// 세션 상태 텍스트
+    private func sessionStatusText(monitor: ClaudeSessionMonitor) -> String {
+        let state = monitor.sessionState
+        switch state.phase {
+        case .responding: return "Responding"
+        case .toolExecuting:
+            if let tool = state.currentToolName {
+                return "ToolExecuting: \(tool)"
+            }
+            return "ToolExecuting"
+        case .waitingForInput: return "Waiting for input"
+        case .sessionActive: return "Active"
+        case .sessionComplete: return "Complete"
+        default: return ""
+        }
+    }
+
+    /// 토큰 수를 읽기 쉽게 포맷한다 (예: 12500 -> 12.5k)
+    private func formatTokenCount(_ count: Int) -> String {
+        if count >= 1_000_000 {
+            return String(format: "%.1fM tokens", Double(count) / 1_000_000.0)
+        } else if count >= 1_000 {
+            return String(format: "%.1fk tokens", Double(count) / 1_000.0)
+        }
+        return "\(count) tokens"
     }
 
     private func abbreviatedPath(_ path: String) -> String {
@@ -262,6 +335,9 @@ struct WorkspaceTabView: View {
     let isActive: Bool
     let isEditing: Bool
     var claudeSessionCount: Int = 0
+    var totalCost: Double = 0
+    var activeProcessName: String? = nil
+    var listeningPorts: [UInt16] = []
     @Binding var editingName: String
     let onSelect: () -> Void
     let onBeginRename: () -> Void
@@ -279,7 +355,7 @@ struct WorkspaceTabView: View {
                 .foregroundColor(.secondary)
                 .frame(width: 14)
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 if isEditing {
                     TextField("Name", text: $editingName, onCommit: onCommitRename)
                         .textFieldStyle(.plain)
@@ -294,21 +370,55 @@ struct WorkspaceTabView: View {
                         .truncationMode(.tail)
                 }
 
-                HStack(spacing: 4) {
-                    Text(abbreviatedPath(workspace.cwd))
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                // 경로
+                Text(abbreviatedPath(workspace.cwd))
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
 
-                    if claudeSessionCount > 0 {
-                        HStack(spacing: 2) {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 5, height: 5)
-                            Text("Claude x\(claudeSessionCount)")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(.green)
+                // 활성 프로세스
+                if let processName = activeProcessName {
+                    HStack(spacing: 3) {
+                        Text("$")
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary)
+                        Text(processName)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                // Claude 세션 수 + 비용
+                if claudeSessionCount > 0 {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 5, height: 5)
+                        Text("Claude x\(claudeSessionCount)")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.green)
+                        if totalCost > 0 {
+                            Text(WorkspaceTabView.formatCost(totalCost))
+                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                // 리스닝 포트
+                if !listeningPorts.isEmpty {
+                    HStack(spacing: 4) {
+                        ForEach(listeningPorts.prefix(4), id: \.self) { port in
+                            Text(":\(port)")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(.orange)
+                        }
+                        if listeningPorts.count > 4 {
+                            Text("+\(listeningPorts.count - 4)")
+                                .font(.system(size: 9))
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
@@ -331,7 +441,7 @@ struct WorkspaceTabView: View {
         }
     }
 
-    /// 경로를 축약하여 표시 (홈 디렉토리 → ~)
+    /// 경로를 축약하여 표시 (홈 디렉토리 -> ~)
     private func abbreviatedPath(_ path: String) -> String {
         let home = NSHomeDirectory()
         if path == home {
@@ -340,5 +450,13 @@ struct WorkspaceTabView: View {
             return "~" + path.dropFirst(home.count)
         }
         return path
+    }
+
+    /// 비용을 포맷한다 ($0.45 형식)
+    static func formatCost(_ cost: Double) -> String {
+        if cost < 0.01 {
+            return String(format: "$%.3f", cost)
+        }
+        return String(format: "$%.2f", cost)
     }
 }
