@@ -38,6 +38,12 @@ final class WorkspaceManager {
         return workspace
     }
 
+    /// 외부에서 생성한 워크스페이스를 추가하고 활성화
+    func addAndActivate(_ workspace: Workspace) {
+        workspaces.append(workspace)
+        activeIndex = workspaces.count - 1
+    }
+
     /// 지정 인덱스의 워크스페이스를 닫는다
     /// 마지막 하나는 닫을 수 없다
     func closeWorkspace(at index: Int) {

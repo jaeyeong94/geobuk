@@ -4,6 +4,7 @@ import SwiftUI
 struct SidebarView: View {
     @Bindable var workspaceManager: WorkspaceManager
     var onWorkspaceSwitch: (() -> Void)?
+    var onCreateWorkspace: (() -> Void)?
     @State private var editingIndex: Int? = nil
     @State private var editingName: String = ""
 
@@ -20,7 +21,7 @@ struct SidebarView: View {
                 Spacer()
 
                 Button(action: {
-                    NotificationCenter.default.post(name: .newWorkspace, object: nil)
+                    onCreateWorkspace?()
                 }) {
                     Image(systemName: "plus")
                         .font(.caption)

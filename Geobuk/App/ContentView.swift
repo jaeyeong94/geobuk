@@ -16,9 +16,11 @@ struct ContentView: View {
             if isInitialized {
                 HStack(spacing: 0) {
                     if isSidebarVisible {
-                        SidebarView(workspaceManager: workspaceManager) {
-                            ensureSurfaceForActiveWorkspace()
-                        }
+                        SidebarView(
+                            workspaceManager: workspaceManager,
+                            onWorkspaceSwitch: { ensureSurfaceForActiveWorkspace() },
+                            onCreateWorkspace: { createNewWorkspace() }
+                        )
                         Divider()
                     }
 
@@ -255,10 +257,17 @@ struct ContentView: View {
     @MainActor
     private func createNewWorkspace() {
         guard isInitialized else { return }
-        let ws = workspaceManager.createWorkspace(name: "Workspace", cwd: nil)
-        let initialPaneId = ws.splitManager.focusedPaneId!
+
+        // 1. Workspace를 먼저 만들되 아직 active로 전환하지 않음
+        let workspace = Workspace(name: "Workspace", cwd: NSHomeDirectory())
+        let initialPaneId = workspace.splitManager.focusedPaneId!
+
+        // 2. Surface를 먼저 생성 (SwiftUI re-render 전에 준비)
         let surfaceView = GhosttySurfaceView(app: ghosttyApp)
         surfaceViews[initialPaneId] = surfaceView
+
+        // 3. 이제 workspace를 추가하고 활성화 → re-render 시 surface가 이미 준비됨
+        workspaceManager.addAndActivate(workspace)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             focusSurfaceView(id: initialPaneId)
