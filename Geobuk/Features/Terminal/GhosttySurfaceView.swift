@@ -270,6 +270,16 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         }
     }
 
+    // MARK: - Binding Actions
+
+    /// Ghostty 내장 액션 실행 (예: "increase_font_size:1", "reset_font_size")
+    func executeAction(_ action: String) {
+        guard let surface else { return }
+        action.withCString { ptr in
+            _ = ghostty_surface_binding_action(surface, ptr, UInt(action.utf8.count))
+        }
+    }
+
     // MARK: - Cleanup
 
     /// Surface 리소스 해제

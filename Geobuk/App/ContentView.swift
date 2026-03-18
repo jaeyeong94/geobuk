@@ -103,7 +103,10 @@ struct ContentView: View {
                 paddingX: $paddingX,
                 paddingY: $paddingY,
                 lineHeight: $lineHeight,
-                onChanged: {
+                onFontSizeChange: { newSize in
+                    setFontSizeForAllSurfaces(newSize)
+                },
+                onConfigChanged: {
                     ghosttyApp.updateSettings(
                         fontSize: fontSize,
                         paddingX: paddingX,
@@ -406,6 +409,27 @@ struct ContentView: View {
     private func focusSurfaceView(id: UUID) {
         guard let surfaceView = surfaceViews[id] else { return }
         surfaceView.window?.makeFirstResponder(surfaceView)
+    }
+
+    /// 모든 surface의 폰트 크기를 binding action으로 변경
+    @MainActor
+    private func setFontSizeForAllSurfaces(_ targetSize: Double) {
+        // reset 후 target까지 증가/감소
+        for surfaceView in surfaceViews.values {
+            surfaceView.executeAction("reset_font_size")
+        }
+        // Ghostty 기본 폰트 크기로 reset 후, 차이만큼 increase/decrease
+        let defaultSize: Double = 13 // Ghostty 기본값
+        let diff = targetSize - defaultSize
+        if diff > 0 {
+            for surfaceView in surfaceViews.values {
+                surfaceView.executeAction("increase_font_size:\(diff)")
+            }
+        } else if diff < 0 {
+            for surfaceView in surfaceViews.values {
+                surfaceView.executeAction("decrease_font_size:\(abs(diff))")
+            }
+        }
     }
 }
 

@@ -7,20 +7,46 @@ struct TerminalSettingsView: View {
     @Binding var paddingY: Double
     @Binding var lineHeight: Double
 
-    var onChanged: () -> Void
+    var onFontSizeChange: (Double) -> Void
+    var onConfigChanged: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Terminal Settings")
                 .font(.headline)
 
+            // 폰트 크기: binding action으로 즉시 반영
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Font Size")
+                        .font(.system(size: 12))
+                    Spacer()
+                    Text(String(format: "%.0f pt", fontSize))
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                Slider(value: $fontSize, in: 8...32, step: 1) { editing in
+                    if !editing {
+                        onFontSizeChange(fontSize)
+                    }
+                }
+            }
+
+            // 행간: config update로 즉시 반영
             settingRow(
-                label: "Font Size",
-                value: $fontSize,
-                range: 8...32,
-                step: 1,
-                format: "%.0f pt"
+                label: "Line Height",
+                value: $lineHeight,
+                range: 0.8...2.0,
+                step: 0.05,
+                format: "%.2f"
             )
+
+            Divider()
+
+            // 패딩: 설정 파일 저장 (다음 surface 생성 시 적용)
+            Text("Padding (applies to new panes)")
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
 
             settingRow(
                 label: "Padding X",
@@ -36,14 +62,6 @@ struct TerminalSettingsView: View {
                 range: 0...40,
                 step: 2,
                 format: "%.0f px"
-            )
-
-            settingRow(
-                label: "Line Height",
-                value: $lineHeight,
-                range: 0.8...2.0,
-                step: 0.05,
-                format: "%.2f"
             )
         }
         .padding(20)
@@ -68,7 +86,7 @@ struct TerminalSettingsView: View {
                     .foregroundColor(.secondary)
             }
             Slider(value: value, in: range, step: step) { _ in
-                onChanged()
+                onConfigChanged()
             }
         }
     }
