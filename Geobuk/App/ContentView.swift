@@ -32,19 +32,8 @@ struct ContentView: View {
                         Divider()
                     }
 
-                    VStack(spacing: 0) {
-                        workspaceContentView
-                            .id(workspaceManager.activeWorkspace?.id)
-
-                        if claudeMonitor.isMonitoring || claudeMonitor.sessionState.phase != .idle {
-                            Divider()
-                            ClaudeSessionPanel(
-                                monitor: claudeMonitor,
-                                isExpanded: $isClaudePanelExpanded,
-                                onNewSession: { startNewClaudeSession() }
-                            )
-                        }
-                    }
+                    workspaceContentView
+                        .id(workspaceManager.activeWorkspace?.id)
                 }
             } else if let errorMessage {
                 VStack(spacing: 12) {
