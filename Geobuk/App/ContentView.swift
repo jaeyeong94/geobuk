@@ -25,6 +25,7 @@ struct ContentView: View {
                     }
 
                     workspaceContentView
+                        .id(workspaceManager.activeWorkspace?.id)
                 }
             } else if let errorMessage {
                 VStack(spacing: 12) {
