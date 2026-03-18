@@ -4,6 +4,8 @@ struct ContentView: View {
     @State private var ghosttyApp = GhosttyApp()
     @State private var splitManager = SplitTreeManager()
     @State private var surfaceViews: [UUID: GhosttySurfaceView] = [:]
+    @State private var sessionManager = SessionManager()
+    @State private var socketServer: SocketServer?
     @State private var errorMessage: String?
     @State private var isInitialized = false
 
@@ -69,6 +71,8 @@ struct ContentView: View {
             closeFocusedPane()
         }
         .onDisappear {
+            Task { await socketServer?.stop() }
+            sessionManager.destroyAllSessions()
             for surfaceView in surfaceViews.values {
                 surfaceView.close()
             }
@@ -92,6 +96,9 @@ struct ContentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 focusSurfaceView(id: initialPaneId)
             }
+
+            // 소켓 서버 시작 (별도 Task로 — initializeTerminal이 블로킹하지 않도록)
+            Task { await startSocketServer() }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -144,6 +151,20 @@ struct ContentView: View {
                     focusSurfaceView(id: newFocusId)
                 }
             }
+        }
+    }
+
+    // MARK: - Socket Server
+
+    @MainActor
+    private func startSocketServer() async {
+        let server = SocketServer(sessionManager: sessionManager)
+        self.socketServer = server
+        do {
+            try await server.start()
+            AppState.shared.isSocketServerRunning = true
+        } catch {
+            // 소켓 서버 실패해도 터미널 기능은 정상
         }
     }
 

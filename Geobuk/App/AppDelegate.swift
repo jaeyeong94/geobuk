@@ -1,6 +1,6 @@
 import AppKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     /// 소켓 서버 인스턴스
     private var socketServer: SocketServer?
 
@@ -9,29 +9,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) lazy var sessionManager = SessionManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // ghostty_init은 GhosttyApp.create()에서 호출됨
+        startSocketServer()
+    }
 
-        // 소켓 서버 시작
-        Task { @MainActor in
-            let manager = sessionManager
-            let server = SocketServer(sessionManager: manager)
-            self.socketServer = server
+    /// SwiftUI에서 applicationDidFinishLaunching이 호출되지 않는 경우를 대비
+    func applicationDidBecomeActive(_ notification: Notification) {
+        startSocketServer()
+    }
+
+    private var socketServerStarted = false
+
+    private func startSocketServer() {
+        guard !socketServerStarted else { return }
+        socketServerStarted = true
+
+        Task {
             do {
+                let manager = await sessionManager
+                let server = SocketServer(sessionManager: manager)
+                await MainActor.run { self.socketServer = server }
                 try await server.start()
-                AppState.shared.isSocketServerRunning = true
+                await MainActor.run { AppState.shared.isSocketServerRunning = true }
             } catch {
-                // 소켓 서버 시작 실패 시 앱은 계속 실행 (터미널 기능은 정상)
-                print("[Geobuk] Socket server start failed: \(error)")
+                fputs("[Geobuk] Socket server failed: \(error)\n", stderr)
             }
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // 소켓 서버 정리
         Task {
             await socketServer?.stop()
         }
-        // 세션 정리
         Task { @MainActor in
             sessionManager.destroyAllSessions()
         }
