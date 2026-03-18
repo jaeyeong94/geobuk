@@ -150,6 +150,52 @@ final class GhosttyApp {
         guard let app else { return }
         ghostty_app_set_focus(app, focused)
     }
+
+    // MARK: - 동적 설정 변경
+
+    /// 설정을 동적으로 변경 (슬라이더 등에서 호출)
+    func updateSettings(fontSize: Double, paddingX: Double, paddingY: Double, lineHeight: Double) {
+        guard let app else { return }
+
+        guard let newConfig = ghostty_config_new() else { return }
+        ghostty_config_load_default_files(newConfig)
+
+        // Geobuk 기본 설정 로드
+        if let configPath = Bundle.main.path(forResource: "geobuk-default", ofType: "conf") {
+            configPath.withCString { ptr in
+                ghostty_config_load_file(newConfig, ptr)
+            }
+        }
+
+        // 사용자 설정 오버라이드를 문자열로 적용
+        let overrides = [
+            "font-size=\(Int(fontSize))",
+            "window-padding-x=\(Int(paddingX))",
+            "window-padding-y=\(Int(paddingY))",
+            "adjust-cell-height=\(Int((lineHeight - 1.0) * 100))%",
+        ]
+
+        for override in overrides {
+            // ghostty_config_load_file은 파일 경로만 받으므로 임시 파일 사용
+            // 대안: 설정을 geobuk-default.conf에 직접 쓰고 reload
+        }
+
+        // 임시 설정 파일 생성
+        let tempPath = NSTemporaryDirectory() + "geobuk-settings-override.conf"
+        let content = overrides.joined(separator: "\n")
+        try? content.write(toFile: tempPath, atomically: true, encoding: .utf8)
+
+        tempPath.withCString { ptr in
+            ghostty_config_load_file(newConfig, ptr)
+        }
+
+        ghostty_config_finalize(newConfig)
+        ghostty_app_update_config(app, newConfig)
+        ghostty_config_free(newConfig)
+
+        // 임시 파일 정리
+        try? FileManager.default.removeItem(atPath: tempPath)
+    }
 }
 
 // MARK: - Errors

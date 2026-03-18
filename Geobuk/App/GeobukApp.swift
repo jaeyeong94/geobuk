@@ -46,6 +46,11 @@ struct GeobukApp: App {
                 }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
 
+                Button("Terminal Settings...") {
+                    NotificationCenter.default.post(name: .openSettings, object: nil)
+                }
+                .keyboardShortcut(",", modifiers: .command)
+
                 Divider()
             }
 
@@ -108,4 +113,5 @@ extension Notification.Name {
     static let toggleSidebar = Notification.Name("toggleSidebar")
     static let switchWorkspaceByNumber = Notification.Name("switchWorkspaceByNumber")
     static let newClaudeSession = Notification.Name("newClaudeSession")
+    static let openSettings = Notification.Name("openSettings")
 }

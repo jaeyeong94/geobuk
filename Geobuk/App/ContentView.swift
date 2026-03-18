@@ -12,7 +12,11 @@ struct ContentView: View {
     @State private var autoSaveTimer: Timer?
     @State private var claudeMonitor = ClaudeSessionMonitor()
     @State private var claudeFileWatcher = ClaudeSessionFileWatcher()
-    @State private var isClaudePanelExpanded = false
+    @State private var isSettingsOpen = false
+    @State private var fontSize: Double = 14
+    @State private var paddingX: Double = 8
+    @State private var paddingY: Double = 4
+    @State private var lineHeight: Double = 1.0
     @State private var processMonitor = PaneProcessMonitor()
 
     var body: some View {
@@ -89,6 +93,25 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .newClaudeSession)) { _ in
             startNewClaudeSession()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
+            isSettingsOpen.toggle()
+        }
+        .popover(isPresented: $isSettingsOpen, arrowEdge: .trailing) {
+            TerminalSettingsView(
+                fontSize: $fontSize,
+                paddingX: $paddingX,
+                paddingY: $paddingY,
+                lineHeight: $lineHeight,
+                onChanged: {
+                    ghosttyApp.updateSettings(
+                        fontSize: fontSize,
+                        paddingX: paddingX,
+                        paddingY: paddingY,
+                        lineHeight: lineHeight
+                    )
+                }
+            )
         }
         .onDisappear {
             autoSaveTimer?.invalidate()
@@ -341,9 +364,7 @@ struct ContentView: View {
     private func startNewClaudeSession() {
         guard isInitialized else { return }
 
-        isClaudePanelExpanded = true
-
-        // 현재 활성 터미널에 claude 명령어 전송 및 PTY 로그 모니터링 시작
+        // 현재 활성 터미널에 claude 명령어 전송
         if let focusedId = activeManager?.focusedPaneId,
            let surfaceView = surfaceViews[focusedId] {
             // PTY 로그 파일을 통한 모니터링 시작
