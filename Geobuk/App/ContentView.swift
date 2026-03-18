@@ -61,6 +61,7 @@ struct ContentView: View {
         .frame(minWidth: 600, minHeight: 400)
         .background(Color.black)
         .task {
+            PTYLogManager.initialize()
             await initializeTerminal()
         }
         .onReceive(NotificationCenter.default.publisher(for: .splitHorizontally)) { _ in
@@ -102,6 +103,8 @@ struct ContentView: View {
         .onDisappear {
             autoSaveTimer?.invalidate()
             processMonitor.stopMonitoring()
+            claudeMonitor.stopAll()
+            PTYLogManager.cleanupAll()
             SessionPersistence.save(manager: workspaceManager)
             Task { await socketServer?.stop() }
             sessionManager.destroyAllSessions()
@@ -266,6 +269,7 @@ struct ContentView: View {
             splitManager.closeFocusedPane()
 
             if let surfaceView = surfaceViews.removeValue(forKey: closingId) {
+                claudeMonitor.stopMonitoring(surfaceViewId: surfaceView.viewId)
                 surfaceView.close()
             }
 
@@ -308,6 +312,7 @@ struct ContentView: View {
         if let workspace = workspaceManager.activeWorkspace {
             for leaf in workspace.splitManager.root.allLeaves() {
                 if let surfaceView = surfaceViews.removeValue(forKey: leaf.id) {
+                    claudeMonitor.stopMonitoring(surfaceViewId: surfaceView.viewId)
                     surfaceView.close()
                 }
             }
@@ -340,13 +345,14 @@ struct ContentView: View {
     private func startNewClaudeSession() {
         guard isInitialized else { return }
 
-        // 모니터링 시작
-        claudeMonitor.startMonitoring()
         isClaudePanelExpanded = true
 
-        // 현재 활성 터미널에 claude 명령어 전송
+        // 현재 활성 터미널에 claude 명령어 전송 및 PTY 로그 모니터링 시작
         if let focusedId = activeManager?.focusedPaneId,
            let surfaceView = surfaceViews[focusedId] {
+            // PTY 로그 파일을 통한 모니터링 시작
+            claudeMonitor.monitor(surfaceViewId: surfaceView.viewId)
+
             let command = "claude --output-format stream-json"
             surfaceView.sendText(command + "\r")
         }

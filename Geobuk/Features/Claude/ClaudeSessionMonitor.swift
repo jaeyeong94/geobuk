@@ -21,6 +21,9 @@ final class ClaudeSessionMonitor {
     /// 모니터링 태스크
     private var monitorTask: Task<Void, Never>?
 
+    /// surfaceViewId -> PTYLogTailer 매핑
+    private var tailers: [UUID: PTYLogTailer] = [:]
+
     init() {
         self.sessionState = ClaudeSessionState()
         self.parser = StreamJSONParser()
@@ -38,6 +41,46 @@ final class ClaudeSessionMonitor {
     func startMonitoring() {
         isMonitoring = true
         isStopped = false
+    }
+
+    /// surface의 PTY 로그 파일을 통해 모니터링 시작
+    func monitor(surfaceViewId: UUID) {
+        let logPath = PTYLogManager.logPath(for: surfaceViewId)
+        let tailer = PTYLogTailer(filePath: logPath)
+        tailers[surfaceViewId] = tailer
+
+        startMonitoring()
+
+        Task {
+            await tailer.startTailing { [weak self] data in
+                guard let self else { return }
+                Task { @MainActor in
+                    await self.feedData(data)
+                }
+            }
+        }
+    }
+
+    /// 특정 surface 모니터링 중지
+    func stopMonitoring(surfaceViewId: UUID) {
+        if let tailer = tailers.removeValue(forKey: surfaceViewId) {
+            Task { await tailer.stopTailing() }
+        }
+        PTYLogManager.cleanup(paneId: surfaceViewId)
+
+        if tailers.isEmpty {
+            stopMonitoring()
+        }
+    }
+
+    /// 모든 모니터링 중지
+    func stopAll() {
+        for (id, tailer) in tailers {
+            Task { await tailer.stopTailing() }
+            PTYLogManager.cleanup(paneId: id)
+        }
+        tailers.removeAll()
+        stopMonitoring()
     }
 
     /// 모니터링을 중지하고 상태를 초기화한다

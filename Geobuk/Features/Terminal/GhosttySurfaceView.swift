@@ -6,6 +6,9 @@ import AppKit
 final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     // MARK: - Properties
 
+    /// surface 식별용 고유 ID (PTY 로그 파일 연결에 사용)
+    let viewId = UUID()
+
     nonisolated(unsafe) private var surface: ghostty_surface_t?
     private weak var ghosttyApp: GhosttyApp?
 
@@ -42,14 +45,24 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         surfaceConfig.font_size = 0 // 0 = config default
         surfaceConfig.context = GHOSTTY_SURFACE_CONTEXT_WINDOW
 
-        // 작업 디렉토리 설정
+        // PTY 로그: script(1) 래퍼 명령어 설정
+        let scriptCmd = PTYLogManager.scriptCommand(for: viewId)
+
+        // 작업 디렉토리 및 command 설정
+        // withCString 블록 안에서 포인터가 유효한 동안 surface를 생성해야 함
         if let cwd {
-            cwd.withCString { ptr in
-                surfaceConfig.working_directory = ptr
-                self.surface = ghostty_surface_new(appHandle, &surfaceConfig)
+            cwd.withCString { cwdPtr in
+                scriptCmd.withCString { cmdPtr in
+                    surfaceConfig.working_directory = cwdPtr
+                    surfaceConfig.command = cmdPtr
+                    self.surface = ghostty_surface_new(appHandle, &surfaceConfig)
+                }
             }
         } else {
-            self.surface = ghostty_surface_new(appHandle, &surfaceConfig)
+            scriptCmd.withCString { cmdPtr in
+                surfaceConfig.command = cmdPtr
+                self.surface = ghostty_surface_new(appHandle, &surfaceConfig)
+            }
         }
     }
 
