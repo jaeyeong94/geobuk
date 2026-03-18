@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var autoSaveTimer: Timer?
     @State private var claudeMonitor = ClaudeSessionMonitor()
     @State private var isClaudePanelExpanded = false
+    @State private var processMonitor = PaneProcessMonitor()
 
     var body: some View {
         Group {
@@ -21,6 +22,7 @@ struct ContentView: View {
                         SidebarView(
                             workspaceManager: workspaceManager,
                             claudeMonitor: claudeMonitor,
+                            processMonitor: processMonitor,
                             onWorkspaceSwitch: { ensureSurfaceForActiveWorkspace() },
                             onCreateWorkspace: { createNewWorkspace() },
                             onNewClaudeSession: { startNewClaudeSession() }
@@ -99,6 +101,7 @@ struct ContentView: View {
         }
         .onDisappear {
             autoSaveTimer?.invalidate()
+            processMonitor.stopMonitoring()
             SessionPersistence.save(manager: workspaceManager)
             Task { await socketServer?.stop() }
             sessionManager.destroyAllSessions()
@@ -181,6 +184,9 @@ struct ContentView: View {
 
             // 소켓 서버 시작
             Task { await startSocketServer() }
+
+            // 프로세스 모니터 시작
+            processMonitor.startMonitoring()
 
             // 자동 저장 타이머 시작 (30초마다)
             startAutoSaveTimer()

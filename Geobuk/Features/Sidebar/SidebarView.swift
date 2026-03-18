@@ -4,6 +4,7 @@ import SwiftUI
 struct SidebarView: View {
     @Bindable var workspaceManager: WorkspaceManager
     var claudeMonitor: ClaudeSessionMonitor?
+    var processMonitor: PaneProcessMonitor?
     var onWorkspaceSwitch: (() -> Void)?
     var onCreateWorkspace: (() -> Void)?
     var onNewClaudeSession: (() -> Void)?
@@ -46,6 +47,7 @@ struct SidebarView: View {
                             index: index,
                             isActive: index == workspaceManager.activeIndex,
                             isEditing: editingIndex == index,
+                            claudeSessionCount: processMonitor?.claudeSessionCount(for: workspace) ?? 0,
                             editingName: $editingName,
                             onSelect: {
                                 workspaceManager.switchToWorkspace(at: index)
@@ -72,6 +74,12 @@ struct SidebarView: View {
                 .padding(.top, 4)
             }
 
+            // 프로세스 모니터에서 감지된 Claude 세션 섹션
+            if let processMonitor, !processMonitor.claudeProcesses.isEmpty {
+                Divider()
+                detectedClaudeSection(processMonitor: processMonitor)
+            }
+
             // Claude 세션 상태 섹션
             if let monitor = claudeMonitor {
                 Divider()
@@ -80,6 +88,55 @@ struct SidebarView: View {
         }
         .frame(minWidth: 160, idealWidth: 200, maxWidth: 280)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+    }
+
+    // MARK: - Detected Claude Sessions Section
+
+    @ViewBuilder
+    private func detectedClaudeSection(processMonitor: PaneProcessMonitor) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Claude Sessions")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+
+                Spacer()
+
+                Text("\(processMonitor.claudeProcesses.count)")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(Color.green))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+
+            // 각 감지된 Claude 세션 목록
+            ForEach(Array(processMonitor.claudeProcesses.values), id: \.claudePid) { info in
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                    Text("\(info.processName) (PID \(info.claudePid))")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 2)
+            }
+
+            Text("\(processMonitor.claudeProcesses.count) sessions active")
+                .font(.system(size: 9))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+        }
     }
 
     // MARK: - Claude Session Section
@@ -147,6 +204,7 @@ struct WorkspaceTabView: View {
     let index: Int
     let isActive: Bool
     let isEditing: Bool
+    var claudeSessionCount: Int = 0
     @Binding var editingName: String
     let onSelect: () -> Void
     let onBeginRename: () -> Void
@@ -179,11 +237,24 @@ struct WorkspaceTabView: View {
                         .truncationMode(.tail)
                 }
 
-                Text(abbreviatedPath(workspace.cwd))
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                HStack(spacing: 4) {
+                    Text(abbreviatedPath(workspace.cwd))
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    if claudeSessionCount > 0 {
+                        HStack(spacing: 2) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 5, height: 5)
+                            Text("Claude x\(claudeSessionCount)")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
             }
 
             Spacer()
