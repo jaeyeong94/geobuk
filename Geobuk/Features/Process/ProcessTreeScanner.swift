@@ -72,6 +72,11 @@ final class ProcessTreeScanner: Sendable {
         return findClaudeRecursive(under: parentPid, allProcesses: all)
     }
 
+    /// 특정 PID의 프로세스가 존재하는지 확인
+    static func processExists(pid: pid_t) -> Bool {
+        kill(pid, 0) == 0
+    }
+
     // MARK: - Private
 
     /// 프로세스 이름을 가져온다

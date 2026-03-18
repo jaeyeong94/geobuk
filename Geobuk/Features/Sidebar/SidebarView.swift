@@ -4,6 +4,7 @@ import SwiftUI
 struct SidebarView: View {
     @Bindable var workspaceManager: WorkspaceManager
     var claudeMonitor: ClaudeSessionMonitor?
+    var claudeFileWatcher: ClaudeSessionFileWatcher?
     var processMonitor: PaneProcessMonitor?
     var onWorkspaceSwitch: (() -> Void)?
     var onCreateWorkspace: (() -> Void)?
@@ -85,6 +86,12 @@ struct SidebarView: View {
                 Divider()
                 claudeSessionSection(monitor: monitor)
             }
+
+            // 파일 기반 Claude 세션 감지
+            if let watcher = claudeFileWatcher, !watcher.activeSessions.isEmpty {
+                Divider()
+                fileWatcherSection(watcher: watcher)
+            }
         }
         .frame(minWidth: 160, idealWidth: 200, maxWidth: 280)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
@@ -137,6 +144,56 @@ struct SidebarView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
         }
+    }
+
+    // MARK: - File Watcher Section
+
+    @ViewBuilder
+    private func fileWatcherSection(watcher: ClaudeSessionFileWatcher) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Active Claude")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+                Spacer()
+                Text("\(watcher.activeSessions.count)")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(Color.green))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+
+            ForEach(watcher.activeSessions) { session in
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("PID \(session.pid)")
+                            .font(.system(size: 10, weight: .medium))
+                        Text(abbreviatedPath(session.cwd))
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 3)
+            }
+        }
+    }
+
+    private func abbreviatedPath(_ path: String) -> String {
+        let home = NSHomeDirectory()
+        if path == home { return "~" }
+        if path.hasPrefix(home) { return "~" + path.dropFirst(home.count) }
+        return path
     }
 
     // MARK: - Claude Session Section

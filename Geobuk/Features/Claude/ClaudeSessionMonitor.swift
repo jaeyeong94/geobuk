@@ -96,13 +96,92 @@ final class ClaudeSessionMonitor {
     // MARK: - 데이터 입력
 
     /// 원시 PTY 출력 데이터를 파서에 전달하고 상태를 갱신한다
-    /// - Parameter data: PTY에서 읽은 원시 바이트 데이터
     func feedData(_ data: Data) async {
         guard !isStopped else { return }
 
         let events = await parser.feed(data)
         for event in events {
             sessionState.processEvent(event)
+        }
+    }
+
+    // MARK: - 트랜스크립트 이벤트 처리
+
+    /// Claude 트랜스크립트 JSONL 이벤트를 처리한다
+    /// stream-json과 다른 포맷이므로 변환하여 sessionState에 전달
+    func processTranscriptEvent(_ event: [String: Any]) {
+        guard let type = event["type"] as? String else { return }
+
+        if !isMonitoring {
+            startMonitoring()
+        }
+
+        // 세션 ID 설정
+        if let sessionId = event["sessionId"] as? String,
+           sessionState.sessionId == nil {
+            sessionState.processEvent(.sessionInit(sessionId: sessionId))
+        }
+
+        switch type {
+        case "user":
+            // 사용자 입력 → 세션 활성
+            sessionState.processEvent(.sessionInit(sessionId: event["sessionId"] as? String ?? ""))
+
+        case "assistant":
+            // Claude 응답
+            if let message = event["message"] as? [String: Any],
+               let content = message["content"] as? [[String: Any]] {
+                for block in content {
+                    if let blockType = block["type"] as? String {
+                        switch blockType {
+                        case "text":
+                            let text = block["text"] as? String ?? ""
+                            sessionState.processEvent(.assistantMessage(text: text))
+
+                        case "tool_use":
+                            let name = block["name"] as? String ?? ""
+                            let id = block["id"] as? String ?? ""
+                            sessionState.processEvent(.toolUse(id: id, name: name, input: ""))
+
+                        case "tool_result":
+                            let id = block["tool_use_id"] as? String ?? ""
+                            sessionState.processEvent(.toolResult(id: id, content: ""))
+
+                        default:
+                            break
+                        }
+                    }
+                }
+            }
+
+            // 토큰 사용량
+            if let usage = event["usage"] as? [String: Any] {
+                let input = usage["input_tokens"] as? Int ?? 0
+                let output = usage["output_tokens"] as? Int ?? 0
+                sessionState.processEvent(.usage(inputTokens: input, outputTokens: output))
+            }
+
+        case "result":
+            if let subtype = event["subtype"] as? String {
+                switch subtype {
+                case "tool_result":
+                    let id = event["toolUseID"] as? String ?? ""
+                    sessionState.processEvent(.toolResult(id: id, content: ""))
+                case "success", "error":
+                    sessionState.processEvent(.result(text: subtype))
+                default:
+                    break
+                }
+            }
+
+        case "system":
+            if let subtype = event["subtype"] as? String, subtype == "turn_duration" {
+                // 턴 완료 → 다시 대기 상태
+                sessionState.processEvent(.result(text: "turn complete"))
+            }
+
+        default:
+            break
         }
     }
 }

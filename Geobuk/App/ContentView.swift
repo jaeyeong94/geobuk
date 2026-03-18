@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var isSidebarVisible = true
     @State private var autoSaveTimer: Timer?
     @State private var claudeMonitor = ClaudeSessionMonitor()
+    @State private var claudeFileWatcher = ClaudeSessionFileWatcher()
     @State private var isClaudePanelExpanded = false
     @State private var processMonitor = PaneProcessMonitor()
 
@@ -22,6 +23,7 @@ struct ContentView: View {
                         SidebarView(
                             workspaceManager: workspaceManager,
                             claudeMonitor: claudeMonitor,
+                            claudeFileWatcher: claudeFileWatcher,
                             processMonitor: processMonitor,
                             onWorkspaceSwitch: { ensureSurfaceForActiveWorkspace() },
                             onCreateWorkspace: { createNewWorkspace() },
@@ -61,7 +63,6 @@ struct ContentView: View {
         .frame(minWidth: 600, minHeight: 400)
         .background(Color.black)
         .task {
-            PTYLogManager.initialize()
             await initializeTerminal()
         }
         .onReceive(NotificationCenter.default.publisher(for: .splitHorizontally)) { _ in
@@ -104,7 +105,7 @@ struct ContentView: View {
             autoSaveTimer?.invalidate()
             processMonitor.stopMonitoring()
             claudeMonitor.stopAll()
-            PTYLogManager.cleanupAll()
+            claudeFileWatcher.stopWatching()
             SessionPersistence.save(manager: workspaceManager)
             Task { await socketServer?.stop() }
             sessionManager.destroyAllSessions()
@@ -190,6 +191,12 @@ struct ContentView: View {
 
             // 프로세스 모니터 시작
             processMonitor.startMonitoring()
+
+            // Claude 세션 파일 감시 시작
+            claudeFileWatcher.onTranscriptEvent = { sessionId, event in
+                claudeMonitor.processTranscriptEvent(event)
+            }
+            claudeFileWatcher.startWatching()
 
             // 자동 저장 타이머 시작 (30초마다)
             startAutoSaveTimer()
