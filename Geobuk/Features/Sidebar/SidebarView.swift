@@ -9,8 +9,10 @@ struct SidebarView: View {
     var onWorkspaceSwitch: (() -> Void)?
     var onCreateWorkspace: (() -> Void)?
     var onNewClaudeSession: (() -> Void)?
+    var onPaneFocus: ((UUID) -> Void)?
     @State private var editingIndex: Int? = nil
     @State private var editingName: String = ""
+    @State private var expandedWorkspaces: Set<Int> = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,32 +45,55 @@ struct SidebarView: View {
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(Array(workspaceManager.workspaces.enumerated()), id: \.element.id) { index, workspace in
-                        WorkspaceTabView(
-                            workspace: workspace,
-                            index: index,
-                            isActive: index == workspaceManager.activeIndex,
-                            isEditing: editingIndex == index,
-                            claudeSessionCount: processMonitor?.claudeSessionCount(for: workspace) ?? 0,
-                            editingName: $editingName,
-                            onSelect: {
-                                workspaceManager.switchToWorkspace(at: index)
-                                onWorkspaceSwitch?()
-                            },
-                            onBeginRename: {
-                                editingName = workspace.name
-                                editingIndex = index
-                            },
-                            onCommitRename: {
-                                workspaceManager.renameWorkspace(at: index, name: editingName)
-                                editingIndex = nil
-                            },
-                            onCancelRename: {
-                                editingIndex = nil
-                            },
-                            onClose: {
-                                workspaceManager.closeWorkspace(at: index)
+                        let isActive = index == workspaceManager.activeIndex
+
+                        VStack(spacing: 0) {
+                            WorkspaceTabView(
+                                workspace: workspace,
+                                index: index,
+                                isActive: isActive,
+                                isEditing: editingIndex == index,
+                                claudeSessionCount: isActive ? 0 : (processMonitor?.claudeSessionCount(for: workspace) ?? 0),
+                                editingName: $editingName,
+                                onSelect: {
+                                    workspaceManager.switchToWorkspace(at: index)
+                                    onWorkspaceSwitch?()
+                                },
+                                onBeginRename: {
+                                    editingName = workspace.name
+                                    editingIndex = index
+                                },
+                                onCommitRename: {
+                                    workspaceManager.renameWorkspace(at: index, name: editingName)
+                                    editingIndex = nil
+                                },
+                                onCancelRename: {
+                                    editingIndex = nil
+                                },
+                                onClose: {
+                                    workspaceManager.closeWorkspace(at: index)
+                                },
+                                isTreeExpanded: isActive,
+                                onToggleTree: nil
+                            )
+
+                            // 활성 워크스페이스: 패널 트리 표시
+                            if isActive {
+                                let panes = workspace.splitManager.root.allLeaves()
+                                if panes.count > 0 {
+                                    PaneTreeView(
+                                        panes: buildPaneInfoList(for: workspace),
+                                        onPaneTap: { paneId in
+                                            workspace.splitManager.setFocusedPane(id: paneId)
+                                            onPaneFocus?(paneId)
+                                        }
+                                    )
+                                    .padding(.leading, 24)
+                                    .padding(.trailing, 8)
+                                    .padding(.bottom, 4)
+                                }
                             }
-                        )
+                        }
                     }
                 }
                 .padding(.horizontal, 6)
@@ -95,6 +120,42 @@ struct SidebarView: View {
         }
         .frame(minWidth: 160, idealWidth: 200, maxWidth: 280)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+    }
+
+    // MARK: - Pane Info Builder
+
+    /// 워크스페이스의 패널 정보를 빌드한다
+    private func buildPaneInfoList(for workspace: Workspace) -> [PaneTreeInfo] {
+        let panes = workspace.splitManager.root.allLeaves()
+        let focusedPaneId = workspace.splitManager.focusedPaneId
+
+        return panes.enumerated().map { index, pane in
+            let isFocused = pane.id == focusedPaneId
+
+            // Claude 프로세스 정보
+            let claudeInfo = processMonitor?.claudeProcesses.values.first(where: { $0.paneId == pane.id })
+            let isClaudeSession = claudeInfo != nil
+
+            // 프로세스명: Claude이면 "claude", 아니면 nil (추후 PTY-PID 매핑으로 확장)
+            let processName: String? = isClaudeSession ? (claudeInfo?.processName ?? "claude") : nil
+
+            // Claude 상태
+            let claudePhase: AISessionPhase? = isClaudeSession ? (claudeMonitor?.sessionState.phase ?? .sessionActive) : nil
+            let tokenCount = isClaudeSession ? (claudeMonitor?.sessionState.tokenUsage.totalTokens ?? 0) : 0
+            let costUSD = isClaudeSession ? (claudeMonitor?.sessionState.costUSD ?? 0) : 0
+
+            return PaneTreeInfo(
+                id: pane.id,
+                index: index + 1,
+                isFocused: isFocused,
+                processName: processName,
+                isClaudeSession: isClaudeSession,
+                claudePhase: claudePhase,
+                tokenCount: tokenCount,
+                costUSD: costUSD,
+                listeningPorts: []
+            )
+        }
     }
 
     // MARK: - Detected Claude Sessions Section
@@ -344,16 +405,27 @@ struct WorkspaceTabView: View {
     let onCommitRename: () -> Void
     let onCancelRename: () -> Void
     let onClose: () -> Void
+    /// 패널 트리가 펼쳐져 있는지 (활성 워크스페이스에서 트리 표시 여부)
+    var isTreeExpanded: Bool = false
+    /// 트리 접기/펼치기 토글 (nil이면 토글 불가)
+    var onToggleTree: (() -> Void)? = nil
 
     @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
-            // 숫자 인덱스
-            Text("\(index + 1)")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .frame(width: 14)
+            // 트리 접기/펼치기 인디케이터 또는 숫자 인덱스
+            if isActive {
+                Text(isTreeExpanded ? "\u{25BC}" : "\u{25B6}")
+                    .font(.system(size: 8))
+                    .foregroundColor(.secondary)
+                    .frame(width: 14)
+            } else {
+                Text("\(index + 1)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .frame(width: 14)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 if isEditing {
@@ -364,61 +436,75 @@ struct WorkspaceTabView: View {
                         .onExitCommand(perform: onCancelRename)
                         .onAppear { isTextFieldFocused = true }
                 } else {
-                    Text(workspace.name)
-                        .font(.system(size: 12, weight: isActive ? .semibold : .regular))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-
-                // 경로
-                Text(abbreviatedPath(workspace.cwd))
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                // 활성 프로세스
-                if let processName = activeProcessName {
-                    HStack(spacing: 3) {
-                        Text("$")
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundColor(.secondary)
-                        Text(processName)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Text(workspace.name)
+                            .font(.system(size: 12, weight: isActive ? .semibold : .regular))
                             .lineLimit(1)
+                            .truncationMode(.tail)
+
+                        // 활성 워크스페이스: 경로를 같은 줄에 표시
+                        if isActive {
+                            Text(abbreviatedPath(workspace.cwd))
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
                     }
                 }
 
-                // Claude 세션 수 + 비용
-                if claudeSessionCount > 0 {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 5, height: 5)
-                        Text("Claude x\(claudeSessionCount)")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.green)
-                        if totalCost > 0 {
-                            Text(WorkspaceTabView.formatCost(totalCost))
+                // 비활성 워크스페이스: 상세 정보를 인라인으로 표시
+                if !isActive {
+                    // 경로
+                    Text(abbreviatedPath(workspace.cwd))
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    // 활성 프로세스
+                    if let processName = activeProcessName {
+                        HStack(spacing: 3) {
+                            Text("$")
                                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                                 .foregroundColor(.secondary)
+                            Text(processName)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
                         }
                     }
-                }
 
-                // 리스닝 포트
-                if !listeningPorts.isEmpty {
-                    HStack(spacing: 4) {
-                        ForEach(listeningPorts.prefix(4), id: \.self) { port in
-                            Text(":\(port)")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(.orange)
+                    // Claude 세션 수 + 비용 (요약)
+                    if claudeSessionCount > 0 {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 5, height: 5)
+                            Text("Claude x\(claudeSessionCount)")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.green)
+                            if totalCost > 0 {
+                                Text(WorkspaceTabView.formatCost(totalCost))
+                                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
                         }
-                        if listeningPorts.count > 4 {
-                            Text("+\(listeningPorts.count - 4)")
-                                .font(.system(size: 9))
-                                .foregroundColor(.secondary)
+                    }
+
+                    // 리스닝 포트 (요약)
+                    if !listeningPorts.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(listeningPorts.prefix(4), id: \.self) { port in
+                                Text(":\(port)")
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundColor(.orange)
+                            }
+                            if listeningPorts.count > 4 {
+                                Text("+\(listeningPorts.count - 4)")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
                 }
