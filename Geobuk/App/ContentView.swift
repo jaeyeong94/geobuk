@@ -260,7 +260,7 @@ struct ContentView: View {
         guard isInitialized else { return }
 
         // 1. Workspace를 먼저 만들되 아직 active로 전환하지 않음
-        let workspace = Workspace(name: "Workspace", cwd: NSHomeDirectory())
+        let workspace = Workspace(name: workspaceManager.nextWorkspaceName(), cwd: NSHomeDirectory())
         let initialPaneId = workspace.splitManager.focusedPaneId!
 
         // 2. Surface를 먼저 생성 (SwiftUI re-render 전에 준비)

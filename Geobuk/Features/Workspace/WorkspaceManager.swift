@@ -16,8 +16,11 @@ final class WorkspaceManager {
         workspaces.indices.contains(activeIndex) ? workspaces[activeIndex] : nil
     }
 
+    /// 워크스페이스 넘버링 카운터
+    private var nextNumber = 2
+
     init() {
-        let workspace = Workspace(name: "Default", cwd: NSHomeDirectory())
+        let workspace = Workspace(name: "Workspace 1", cwd: NSHomeDirectory())
         workspaces.append(workspace)
     }
 
@@ -36,6 +39,13 @@ final class WorkspaceManager {
         workspaces.append(workspace)
         activeIndex = workspaces.count - 1
         return workspace
+    }
+
+    /// 다음 워크스페이스 이름 생성 (Workspace 2, 3, ...)
+    func nextWorkspaceName() -> String {
+        let name = "Workspace \(nextNumber)"
+        nextNumber += 1
+        return name
     }
 
     /// 외부에서 생성한 워크스페이스를 추가하고 활성화
