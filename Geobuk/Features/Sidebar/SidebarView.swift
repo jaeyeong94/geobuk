@@ -20,7 +20,7 @@ struct SidebarView: View {
                 Spacer()
 
                 Button(action: {
-                    _ = workspaceManager.createWorkspace(name: "Workspace", cwd: nil)
+                    NotificationCenter.default.post(name: .newWorkspace, object: nil)
                 }) {
                     Image(systemName: "plus")
                         .font(.caption)
