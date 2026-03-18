@@ -12,8 +12,8 @@ struct GeobukApp: App {
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("New Terminal Tab") {
-                    NotificationCenter.default.post(name: .newTerminalTab, object: nil)
+                Button("New Workspace") {
+                    NotificationCenter.default.post(name: .newWorkspace, object: nil)
                 }
                 .keyboardShortcut("t", modifiers: .command)
 
@@ -33,9 +33,19 @@ struct GeobukApp: App {
                     NotificationCenter.default.post(name: .closePane, object: nil)
                 }
                 .keyboardShortcut("w", modifiers: .command)
+
+                Button("Close Workspace") {
+                    NotificationCenter.default.post(name: .closeWorkspace, object: nil)
+                }
+                .keyboardShortcut("w", modifiers: [.command, .shift])
             }
 
             CommandGroup(after: .windowArrangement) {
+                Button("Toggle Sidebar") {
+                    NotificationCenter.default.post(name: .toggleSidebar, object: nil)
+                }
+                .keyboardShortcut("b", modifiers: .command)
+
                 Button("Toggle Maximize") {
                     NotificationCenter.default.post(name: .toggleMaximize, object: nil)
                 }
@@ -62,6 +72,16 @@ struct GeobukApp: App {
                     NotificationCenter.default.post(name: .focusPaneDirection, object: NavigationDirection.down)
                 }
                 .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+
+                Divider()
+
+                // Cmd+1~9: Switch workspace by number
+                ForEach(1...9, id: \.self) { number in
+                    Button("Workspace \(number)") {
+                        NotificationCenter.default.post(name: .switchWorkspaceByNumber, object: number)
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character("\(number)")), modifiers: .command)
+                }
             }
         }
     }
@@ -74,4 +94,8 @@ extension Notification.Name {
     static let toggleMaximize = Notification.Name("toggleMaximize")
     static let focusPaneDirection = Notification.Name("focusPaneDirection")
     static let closePane = Notification.Name("closePane")
+    static let newWorkspace = Notification.Name("newWorkspace")
+    static let closeWorkspace = Notification.Name("closeWorkspace")
+    static let toggleSidebar = Notification.Name("toggleSidebar")
+    static let switchWorkspaceByNumber = Notification.Name("switchWorkspaceByNumber")
 }
