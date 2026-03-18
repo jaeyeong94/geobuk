@@ -21,9 +21,12 @@ final class PTYLogManager {
     /// script(1) 래퍼 명령어 생성
     /// macOS: script -q -F <logfile> $SHELL
     static func scriptCommand(for paneId: UUID) -> String {
+        // 디렉토리가 없으면 미리 생성
+        initialize()
         let path = logPath(for: paneId)
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        return "script -q -F \(path) \(shell)"
+        // 경로에 공백이 있을 수 있으므로 인용 부호 필수 (Application Support 등)
+        return "script -q -F '\(path)' \(shell)"
     }
 
     /// 로그 디렉토리 초기화 (앱 시작 시 이전 로그 정리)
