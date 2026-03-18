@@ -257,6 +257,16 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         ghostty_surface_mouse_pos(surface, -1, -1, mods)
     }
 
+    // MARK: - Text Input
+
+    /// 터미널에 텍스트를 직접 전송한다 (프로그래밍 방식으로 명령 입력 시 사용)
+    func sendText(_ text: String) {
+        guard let surface else { return }
+        text.withCString { ptr in
+            ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
+        }
+    }
+
     // MARK: - Cleanup
 
     /// Surface 리소스 해제

@@ -10,6 +10,8 @@ struct ContentView: View {
     @State private var isInitialized = false
     @State private var isSidebarVisible = true
     @State private var autoSaveTimer: Timer?
+    @State private var claudeMonitor = ClaudeSessionMonitor()
+    @State private var isClaudePanelExpanded = false
 
     var body: some View {
         Group {
@@ -18,14 +20,27 @@ struct ContentView: View {
                     if isSidebarVisible {
                         SidebarView(
                             workspaceManager: workspaceManager,
+                            claudeMonitor: claudeMonitor,
                             onWorkspaceSwitch: { ensureSurfaceForActiveWorkspace() },
-                            onCreateWorkspace: { createNewWorkspace() }
+                            onCreateWorkspace: { createNewWorkspace() },
+                            onNewClaudeSession: { startNewClaudeSession() }
                         )
                         Divider()
                     }
 
-                    workspaceContentView
-                        .id(workspaceManager.activeWorkspace?.id)
+                    VStack(spacing: 0) {
+                        workspaceContentView
+                            .id(workspaceManager.activeWorkspace?.id)
+
+                        if claudeMonitor.isMonitoring || claudeMonitor.sessionState.phase != .idle {
+                            Divider()
+                            ClaudeSessionPanel(
+                                monitor: claudeMonitor,
+                                isExpanded: $isClaudePanelExpanded,
+                                onNewSession: { startNewClaudeSession() }
+                            )
+                        }
+                    }
                 }
             } else if let errorMessage {
                 VStack(spacing: 12) {
@@ -78,6 +93,9 @@ struct ContentView: View {
                 workspaceManager.switchToWorkspace(at: number - 1)
                 ensureSurfaceForActiveWorkspace()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .newClaudeSession)) { _ in
+            startNewClaudeSession()
         }
         .onDisappear {
             autoSaveTimer?.invalidate()
@@ -307,6 +325,24 @@ struct ContentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 focusSurfaceView(id: focusedId)
             }
+        }
+    }
+
+    // MARK: - Claude Session
+
+    @MainActor
+    private func startNewClaudeSession() {
+        guard isInitialized else { return }
+
+        // 모니터링 시작
+        claudeMonitor.startMonitoring()
+        isClaudePanelExpanded = true
+
+        // 현재 활성 터미널에 claude 명령어 전송
+        if let focusedId = activeManager?.focusedPaneId,
+           let surfaceView = surfaceViews[focusedId] {
+            let command = "claude --output-format stream-json"
+            surfaceView.sendText(command + "\r")
         }
     }
 

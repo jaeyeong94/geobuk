@@ -76,7 +76,7 @@ struct SessionPersistenceTests {
     @Test("PersistedState_전체roundTrip")
     func persistedState_fullRoundTrip() throws {
         let layout = PersistedSplitNode(type: .leaf, direction: nil, ratio: nil, children: nil)
-        let ws1 = PersistedWorkspace(name: "Default", cwd: "/Users/test", splitLayout: layout)
+        let ws1 = PersistedWorkspace(name: "Workspace 1", cwd: "/Users/test", splitLayout: layout)
         let ws2 = PersistedWorkspace(name: "Project", cwd: "/tmp/project", splitLayout: layout)
         let state = PersistedState(workspaces: [ws1, ws2], activeIndex: 1)
 
@@ -84,7 +84,7 @@ struct SessionPersistenceTests {
         let decoded = try JSONDecoder().decode(PersistedState.self, from: data)
         #expect(decoded.workspaces.count == 2)
         #expect(decoded.activeIndex == 1)
-        #expect(decoded.workspaces[0].name == "Default")
+        #expect(decoded.workspaces[0].name == "Workspace 1")
         #expect(decoded.workspaces[1].name == "Project")
     }
 
@@ -199,7 +199,7 @@ struct SessionPersistenceTests {
         let state = SessionPersistence.snapshot(from: manager)
         #expect(state.workspaces.count == 1)
         #expect(state.activeIndex == 0)
-        #expect(state.workspaces[0].name == "Default")
+        #expect(state.workspaces[0].name == "Workspace 1")
     }
 
     @Test("snapshot_복수워크스페이스_모두포함")
@@ -273,7 +273,7 @@ struct SessionPersistenceTests {
         {
             "workspaces": [
                 {
-                    "name": "Default",
+                    "name": "Workspace 1",
                     "cwd": "/tmp",
                     "splitLayout": { "type": "leaf" },
                     "extraField": "ignored"
@@ -286,6 +286,6 @@ struct SessionPersistenceTests {
         let data = json.data(using: .utf8)!
         let decoded = try JSONDecoder().decode(PersistedState.self, from: data)
         #expect(decoded.workspaces.count == 1)
-        #expect(decoded.workspaces[0].name == "Default")
+        #expect(decoded.workspaces[0].name == "Workspace 1")
     }
 }

@@ -12,7 +12,7 @@ struct WorkspaceManagerTests {
     func init_defaultWorkspace_oneCreated() {
         let manager = WorkspaceManager()
         #expect(manager.workspaces.count == 1)
-        #expect(manager.workspaces[0].name == "Default")
+        #expect(manager.workspaces[0].name == "Workspace 1")
     }
 
     @Test("init_activeIndex_0")
@@ -25,7 +25,7 @@ struct WorkspaceManagerTests {
     func init_activeWorkspace_notNil() {
         let manager = WorkspaceManager()
         #expect(manager.activeWorkspace != nil)
-        #expect(manager.activeWorkspace?.name == "Default")
+        #expect(manager.activeWorkspace?.name == "Workspace 1")
     }
 
     @Test("init_기본cwd_홈디렉토리")
@@ -80,7 +80,7 @@ struct WorkspaceManagerTests {
 
         manager.closeWorkspace(at: 1)
         #expect(manager.workspaces.count == 2)
-        #expect(manager.workspaces.map(\.name) == ["Default", "Third"])
+        #expect(manager.workspaces.map(\.name) == ["Workspace 1", "Third"])
     }
 
     @Test("closeWorkspace_마지막하나_닫히지않음")
@@ -143,7 +143,7 @@ struct WorkspaceManagerTests {
         _ = manager.createWorkspace(name: "Second", cwd: nil)
         manager.switchToWorkspace(at: 0)
         #expect(manager.activeIndex == 0)
-        #expect(manager.activeWorkspace?.name == "Default")
+        #expect(manager.activeWorkspace?.name == "Workspace 1")
     }
 
     @Test("switchToWorkspace_범위밖_변경없음")
@@ -175,14 +175,14 @@ struct WorkspaceManagerTests {
     func renameWorkspace_outOfBounds_noChange() {
         let manager = WorkspaceManager()
         manager.renameWorkspace(at: 5, name: "Invalid")
-        #expect(manager.workspaces[0].name == "Default")
+        #expect(manager.workspaces[0].name == "Workspace 1")
     }
 
     @Test("renameWorkspace_빈이름_변경안됨")
     func renameWorkspace_emptyName_notChanged() {
         let manager = WorkspaceManager()
         manager.renameWorkspace(at: 0, name: "")
-        #expect(manager.workspaces[0].name == "Default")
+        #expect(manager.workspaces[0].name == "Workspace 1")
     }
 
     // MARK: - 워크스페이스 이동 (재정렬)
@@ -195,7 +195,7 @@ struct WorkspaceManagerTests {
         manager.switchToWorkspace(at: 0)
 
         manager.moveWorkspace(from: 0, to: 2)
-        #expect(manager.workspaces.map(\.name) == ["Second", "Third", "Default"])
+        #expect(manager.workspaces.map(\.name) == ["Second", "Third", "Workspace 1"])
     }
 
     @Test("moveWorkspace_뒤에서앞으로_순서변경")
@@ -206,7 +206,7 @@ struct WorkspaceManagerTests {
         manager.switchToWorkspace(at: 2)
 
         manager.moveWorkspace(from: 2, to: 0)
-        #expect(manager.workspaces.map(\.name) == ["Third", "Default", "Second"])
+        #expect(manager.workspaces.map(\.name) == ["Third", "Workspace 1", "Second"])
     }
 
     @Test("moveWorkspace_활성워크스페이스이동_인덱스추적")
@@ -219,7 +219,7 @@ struct WorkspaceManagerTests {
 
         manager.moveWorkspace(from: 0, to: 2)
         // Default가 끝으로 이동, activeIndex도 따라가야 함
-        #expect(manager.activeWorkspace?.name == "Default")
+        #expect(manager.activeWorkspace?.name == "Workspace 1")
     }
 
     @Test("moveWorkspace_범위밖_변경없음")
@@ -238,7 +238,7 @@ struct WorkspaceManagerTests {
         let manager = WorkspaceManager()
         _ = manager.createWorkspace(name: "Second", cwd: nil)
         manager.moveWorkspace(from: 0, to: 0)
-        #expect(manager.workspaces.map(\.name) == ["Default", "Second"])
+        #expect(manager.workspaces.map(\.name) == ["Workspace 1", "Second"])
     }
 
     // MARK: - Edge Cases

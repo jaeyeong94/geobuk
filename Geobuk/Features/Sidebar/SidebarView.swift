@@ -3,8 +3,10 @@ import SwiftUI
 /// 워크스페이스 목록을 표시하는 사이드바 뷰
 struct SidebarView: View {
     @Bindable var workspaceManager: WorkspaceManager
+    var claudeMonitor: ClaudeSessionMonitor?
     var onWorkspaceSwitch: (() -> Void)?
     var onCreateWorkspace: (() -> Void)?
+    var onNewClaudeSession: (() -> Void)?
     @State private var editingIndex: Int? = nil
     @State private var editingName: String = ""
 
@@ -69,9 +71,71 @@ struct SidebarView: View {
                 .padding(.horizontal, 6)
                 .padding(.top, 4)
             }
+
+            // Claude 세션 상태 섹션
+            if let monitor = claudeMonitor {
+                Divider()
+                claudeSessionSection(monitor: monitor)
+            }
         }
         .frame(minWidth: 160, idealWidth: 200, maxWidth: 280)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+    }
+
+    // MARK: - Claude Session Section
+
+    @ViewBuilder
+    private func claudeSessionSection(monitor: ClaudeSessionMonitor) -> some View {
+        VStack(spacing: 0) {
+            // Claude 섹션 헤더
+            HStack {
+                Text("Claude")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+
+                Spacer()
+
+                Button(action: {
+                    onNewClaudeSession?()
+                }) {
+                    Image(systemName: "plus")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("New Claude Session (Cmd+Shift+C)")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+
+            // 세션 상태 표시
+            if monitor.sessionState.phase != .idle {
+                ClaudeStatusView(sessionState: monitor.sessionState)
+                    .padding(.horizontal, 6)
+                    .padding(.bottom, 6)
+            } else {
+                Button(action: { onNewClaudeSession?() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "terminal")
+                            .font(.system(size: 10))
+                        Text("New Session")
+                            .font(.system(size: 11))
+                    }
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.secondary.opacity(0.1))
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 6)
+            }
+        }
     }
 }
 
