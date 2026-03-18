@@ -63,9 +63,39 @@ struct TerminalSettingsView: View {
                 step: 2,
                 format: "%.0f px"
             )
+
+            Divider()
+
+            Button(action: resetToDefaults) {
+                HStack {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 11))
+                    Text("Reset to Defaults")
+                        .font(.system(size: 12))
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.accentColor)
         }
         .padding(20)
         .frame(width: 320)
+    }
+
+    private func resetToDefaults() {
+        fontSize = Defaults.fontSize
+        paddingX = Defaults.paddingX
+        paddingY = Defaults.paddingY
+        lineHeight = Defaults.lineHeight
+        onFontSizeChange(fontSize)
+        onConfigChanged()
+    }
+
+    enum Defaults {
+        static let fontSize: Double = 14
+        static let paddingX: Double = 8
+        static let paddingY: Double = 4
+        static let lineHeight: Double = 1.0
     }
 
     @ViewBuilder
