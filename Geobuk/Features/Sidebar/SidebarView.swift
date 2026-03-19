@@ -43,7 +43,7 @@ struct SidebarView: View {
 
             Divider()
 
-            // 워크스페이스 목록
+            // 전체 스크롤 (워크스페이스 + Claude 섹션)
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(Array(workspaceManager.workspaces.enumerated()), id: \.element.id) { index, workspace in
@@ -110,19 +110,19 @@ struct SidebarView: View {
                 }
                 .padding(.horizontal, 6)
                 .padding(.top, 4)
-            }
 
-            // 프로세스 모니터에서 감지된 Claude 세션 섹션
-            if let processMonitor, !processMonitor.claudeProcesses.isEmpty {
-                Divider()
-                detectedClaudeSection(processMonitor: processMonitor)
-            }
+                // 프로세스 모니터에서 감지된 Claude 세션 섹션
+                if let processMonitor, !processMonitor.claudeProcesses.isEmpty {
+                    Divider()
+                    detectedClaudeSection(processMonitor: processMonitor)
+                }
 
-            // 파일 기반 Claude 세션 감지
-            if let watcher = claudeFileWatcher, !watcher.activeSessions.isEmpty {
-                Divider()
-                fileWatcherSection(watcher: watcher)
-                    .padding(.bottom, 16)
+                // 파일 기반 Claude 세션 감지
+                if let watcher = claudeFileWatcher, !watcher.activeSessions.isEmpty {
+                    Divider()
+                    fileWatcherSection(watcher: watcher)
+                        .padding(.bottom, 16)
+                }
             }
         }
         .frame(minWidth: 160, idealWidth: 200, maxWidth: 280)
