@@ -42,6 +42,10 @@ _geobuk_preexec() {
     local cmd="${1//\"/\\\"}"
     _geobuk_send '{"jsonrpc":"2.0","method":"shell.reportState","params":{"surfaceId":"'"$GEOBUK_SURFACE_ID"'","state":"running","command":"'"$cmd"'"}}'
 
+    # 셸이 echo한 명령어 줄을 지우고 블록 헤더로 대체
+    # 커서를 한 줄 위로 이동 + 줄 전체 삭제
+    printf '\e[1A\e[2K'
+
     # 블록 구분: 명령어 헤더
     _GEOBUK_CMD_RUNNING=1
     local w=$(_geobuk_cols)
