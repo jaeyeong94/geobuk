@@ -231,6 +231,7 @@ struct ContentView: View {
     @MainActor
     private func initializeTerminal() async {
         GeobukLogger.info(.app, "App initializing")
+        BlockModeZshSetup.initialize()
         do {
             try ghosttyApp.create()
 
