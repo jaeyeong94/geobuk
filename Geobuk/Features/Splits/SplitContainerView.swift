@@ -127,7 +127,7 @@ struct SplitPaneView: View {
                     }
             }
         }
-        .border(isFocused ? Color.gray.opacity(0.4) : Color.gray.opacity(0.15), width: 1)
+        .border(isFocused ? Color.blue.opacity(0.6) : Color.gray.opacity(0.2), width: 1)
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
     }
@@ -143,7 +143,7 @@ struct SplitDividerView<First: View, Second: View>: View {
     let first: () -> First
     let second: () -> Second
 
-    private let dividerThickness: CGFloat = 4
+    private let dividerThickness: CGFloat = 1
     private let minRatio: CGFloat = 0.1
     private let maxRatio: CGFloat = 0.9
 
