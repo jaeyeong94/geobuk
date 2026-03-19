@@ -270,35 +270,30 @@ struct SidebarView: View {
                 || ws.cwd == session.cwd
         }
 
-        HStack(alignment: .top, spacing: 5) {
-            // 상태 인디케이터
+        HStack(spacing: 4) {
             Circle()
                 .fill(sessionStatusColor(for: session))
-                .frame(width: 7, height: 7)
-                .padding(.top, 3)
+                .frame(width: 6, height: 6)
 
-            VStack(alignment: .leading, spacing: 2) {
-                // 라인 1: 모델 이름
-                Text(claudeMonitor?.sessionModels[session.sessionId] ?? "claude")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
+            VStack(alignment: .leading, spacing: 1) {
+                // 라인 1: 모델 + phase
+                HStack(spacing: 4) {
+                    Text(claudeMonitor?.sessionModels[session.sessionId] ?? "claude")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
 
-                // 라인 2: Phase + 도구
-                if let monitor = claudeMonitor,
-                   let state = monitor.getState(for: session.sessionId) {
-                    Text(phaseText(state.phase, toolName: state.currentToolName))
-                        .font(.system(size: 9))
-                        .foregroundColor(state.phase == .waitingForInput ? .yellow : .secondary)
+                    if let state = claudeMonitor?.getState(for: session.sessionId),
+                       state.phase != .idle {
+                        Text(phaseText(state.phase, toolName: state.currentToolName))
+                            .font(.system(size: 9))
+                            .foregroundColor(state.phase == .waitingForInput ? .yellow : .secondary)
+                            .lineLimit(1)
+                    }
                 }
 
-                // 라인 3: 턴 시간 + 토큰 + 비용
+                // 라인 2: 토큰 + 비용 + 턴 시간
                 HStack(spacing: 4) {
-                    if let durationMs = claudeMonitor?.sessionTurnDurations[session.sessionId] {
-                        Text(formatDuration(durationMs))
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    }
                     if let state = claudeMonitor?.getState(for: session.sessionId),
                        state.tokenUsage.totalTokens > 0 {
                         Text(formatTokenCount(state.tokenUsage.totalTokens))
@@ -308,28 +303,29 @@ struct SidebarView: View {
                     if let state = claudeMonitor?.getState(for: session.sessionId),
                        state.costUSD > 0 {
                         Text(String(format: "$%.2f", state.costUSD))
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .font(.system(size: 9, design: .monospaced))
                             .foregroundColor(.orange)
+                    }
+                    if let durationMs = claudeMonitor?.sessionTurnDurations[session.sessionId] {
+                        Text(formatDuration(durationMs))
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(.secondary)
                     }
                 }
 
-                // 라인 4: Git 브랜치 + 경로
-                HStack(spacing: 3) {
-                    if let branch = claudeMonitor?.sessionBranches[session.sessionId] {
-                        Text(branch)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.green)
-                    }
-                    Text(abbreviatedPath(session.cwd))
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
+                // 라인 3: 경로
+                Text(abbreviatedPath(session.cwd))
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
+
+            Spacer()
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.leading, 6)
+        .padding(.trailing, 4)
+        .padding(.vertical, 3)
         .contentShape(Rectangle())
         .onTapGesture {
             // 해당 워크스페이스로 전환 + 포커싱
