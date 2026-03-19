@@ -39,6 +39,9 @@ struct BlockInputBar: View {
     /// Ctrl+C 전송 콜백 (인터럽트)
     let onInterrupt: () -> Void
 
+    /// suggestion 리스트 최대 표시 수
+    private static let maxVisibleSuggestions = 8
+
     /// suggestion 리스트가 보이는지 여부
     private var showSuggestionList: Bool {
         suggestions.count > 1
@@ -69,7 +72,7 @@ struct BlockInputBar: View {
 
     private var suggestionListView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            let maxVisible = min(suggestions.count, 8)
+            let maxVisible = min(suggestions.count, Self.maxVisibleSuggestions)
             ForEach(0..<maxVisible, id: \.self) { index in
                 HStack(spacing: 6) {
                     // 파일/디렉토리 아이콘
@@ -107,8 +110,8 @@ struct BlockInputBar: View {
                 }
             }
 
-            if suggestions.count > 8 {
-                Text("  \(suggestions.count - 8) more…")
+            if suggestions.count > Self.maxVisibleSuggestions {
+                Text("  \(suggestions.count - Self.maxVisibleSuggestions) more…")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.secondary.opacity(0.5))
                     .padding(.horizontal, 12)
@@ -137,25 +140,21 @@ struct BlockInputBar: View {
     }
 
     /// suggestion 텍스트에서 입력 부분과 완성 부분을 다르게 표시한다
+    @ViewBuilder
     private func suggestionText(for text: String) -> some View {
         let input = persistentText
-        if text.hasPrefix(input) {
-            let remainder = String(text.dropFirst(input.count))
-            return HStack(spacing: 0) {
-                Text(input)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(.secondary.opacity(0.6))
+        let (prefix, remainder) = text.hasPrefix(input)
+            ? (input, String(text.dropFirst(input.count)))
+            : (text, "")
+
+        HStack(spacing: 0) {
+            Text(prefix)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(.secondary.opacity(0.6))
+            if !remainder.isEmpty {
                 Text(remainder)
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundColor(.primary)
-            }
-        } else {
-            return HStack(spacing: 0) {
-                Text(text)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(.primary)
-                Text("")
-                    .font(.system(size: 12, design: .monospaced))
             }
         }
     }
@@ -324,21 +323,21 @@ struct BlockInputBar: View {
 
     // MARK: - Completion & Suggestions
 
-    /// 입력 변경 시 완성 힌트와 후보 목록을 갱신한다
+    /// 입력 변경 시 완성 후보 목록을 갱신한다 (1회 호출로 힌트 + 리스트 모두 처리)
     private func updateCompletions(for text: String) {
-        // 인라인 힌트 (기존)
-        completionHint = CompletionProvider.suggest(
-            for: text,
-            currentDirectory: currentDirectory,
-            history: commandHistory
-        )
-
-        // 복수 후보 목록
         let candidates = CompletionProvider.suggestAll(
             for: text,
             currentDirectory: currentDirectory,
             history: commandHistory
         )
+
+        // 인라인 힌트: 첫 번째 후보에서 입력 부분을 제외한 나머지
+        if let first = candidates.first, first.hasPrefix(text), first != text {
+            completionHint = String(first.dropFirst(text.count))
+        } else {
+            completionHint = nil
+        }
+
         // 후보가 바뀌었을 때만 인덱스 리셋 (방향키로 선택 중인 상태 유지)
         if candidates != suggestions {
             suggestions = candidates
@@ -358,7 +357,7 @@ struct BlockInputBar: View {
 
     /// suggestion 리스트 내에서 선택을 이동한다
     private func navigateSuggestion(direction: Int) {
-        let count = min(suggestions.count, 8)
+        let count = min(suggestions.count, Self.maxVisibleSuggestions)
         guard count > 0 else { return }
         selectedSuggestionIndex = (selectedSuggestionIndex + direction + count) % count
         confirmedSelection = suggestions[selectedSuggestionIndex]

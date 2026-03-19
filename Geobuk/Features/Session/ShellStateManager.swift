@@ -127,11 +127,11 @@ extension ShellStateManager {
         cachedListeningPorts = results
     }
 
-    /// TTY에서 실행 중인 프로세스 조회 (ps -t)
-    nonisolated static func processesOnTTY(_ ttyName: String) -> [ProcInfo] {
+    /// 외부 명령을 실행하고 stdout 출력을 반환한다
+    nonisolated static func runCommand(executable: String, arguments: [String]) -> String? {
         let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/bin/ps")
-        task.arguments = ["-t", ttyName, "-o", "pid=,comm="]
+        task.executableURL = URL(fileURLWithPath: executable)
+        task.arguments = arguments
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
@@ -139,16 +139,23 @@ extension ShellStateManager {
         do {
             try task.run()
             task.waitUntilExit()
-        } catch { return [] }
+        } catch { return nil }
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { return [] }
+        return String(data: data, encoding: .utf8)
+    }
 
+    /// TTY에서 실행 중인 프로세스 조회 (ps -t)
+    nonisolated static func processesOnTTY(_ ttyName: String) -> [ProcInfo] {
+        guard let output = runCommand(executable: "/bin/ps", arguments: ["-t", ttyName, "-o", "pid=,comm="]) else {
+            return []
+        }
         return parsePsOutput(output)
     }
 
     /// ps 출력을 파싱한다
     nonisolated static func parsePsOutput(_ output: String) -> [ProcInfo] {
+        let shellNames: Set<String> = ["zsh", "-zsh", "bash", "-bash", "login", "sh"]
         var results: [ProcInfo] = []
         for line in output.components(separatedBy: "\n") {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -156,8 +163,6 @@ extension ShellStateManager {
             let parts = trimmed.split(maxSplits: 1, whereSeparator: { $0.isWhitespace })
             guard parts.count == 2, let pid = Int32(parts[0]) else { continue }
             let name = String(parts[1])
-            // 셸 자체는 제외 (zsh, bash, login)
-            let shellNames = ["zsh", "-zsh", "bash", "-bash", "login", "sh"]
             if shellNames.contains(name) || name.hasSuffix("/zsh") || name.hasSuffix("/bash") { continue }
             results.append(ProcInfo(pid: pid, parentPid: 0, name: name))
         }
@@ -169,24 +174,12 @@ extension ShellStateManager {
         guard !pids.isEmpty else { return [] }
         let pidList = pids.map { String($0) }.joined(separator: ",")
 
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-        task.arguments = ["-nP", "-a", "-p", pidList, "-iTCP", "-sTCP:LISTEN", "-Fn"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-        } catch { return [] }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { return [] }
+        guard let output = runCommand(executable: "/usr/sbin/lsof", arguments: ["-nP", "-a", "-p", pidList, "-iTCP", "-sTCP:LISTEN", "-Fn"]) else {
+            return []
+        }
 
         var ports: Set<UInt16> = []
         for line in output.components(separatedBy: "\n") {
-            // "n*:3000" or "n127.0.0.1:8080"
             guard line.hasPrefix("n"), let colonIdx = line.lastIndex(of: ":") else { continue }
             let portStr = String(line[line.index(after: colonIdx)...])
             if let port = UInt16(portStr) {
