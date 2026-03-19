@@ -124,33 +124,23 @@ struct SplitPaneView: View {
                             ),
                             currentDirectory: surfaceView.currentDirectory,
                             onSubmit: { command in
+                                // 명령 제출 마킹 (prompt 알림보다 먼저)
+                                surfaceView.pendingCommandSubmitted = true
                                 surfaceView.sendText(command)
                                 surfaceView.sendKeyPress(keyCode: 36, char: "\r")
 
                                 Task { @MainActor in
-                                    // 500ms 대기 — 빠른 명령이면 셸이 이미 prompt 상태로 복귀함
+                                    // 500ms 대기
                                     try? await Task.sleep(nanoseconds: 500_000_000)
 
-                                    // 빠른 명령 판별: 이미 prompt 알림을 받았으면 입력창 유지
-                                    // (promptReceived는 onReceive에서 설정됨)
-                                    // 여기서는 TUI 모드 전환만 담당하고, 복귀는 알림으로 처리
-                                    if !surfaceView.isCommandRunning {
-                                        // 아직 running 전환 전인데 prompt가 왔으면 빠른 명령
-                                        return
-                                    }
+                                    // 이미 prompt 알림으로 복귀했으면 (빠른 명령) → 아무것도 안 함
+                                    guard surfaceView.pendingCommandSubmitted else { return }
 
-                                    // 느린 명령: TUI 모드로 전환
+                                    // 500ms 후에도 prompt가 안 왔으면 → 느린 명령 → TUI 모드
+                                    surfaceView.pendingCommandSubmitted = false
+                                    surfaceView.isCommandRunning = true; isRunning = true
                                     surfaceView.blockInputMode = false
                                     surfaceView.window?.makeFirstResponder(surfaceView)
-                                }
-
-                                // 느린 명령 대비: running 상태로 전환 예약
-                                Task { @MainActor in
-                                    try? await Task.sleep(nanoseconds: 500_000_000)
-                                    // 500ms 후에도 prompt 알림이 안 왔으면 느린 명령
-                                    if !surfaceView.isCommandRunning {
-                                        surfaceView.isCommandRunning = true; isRunning = true
-                                    }
                                 }
                             },
                             onTab: {
@@ -191,6 +181,8 @@ struct SplitPaneView: View {
                   sid == surfaceView.viewId.uuidString else { return }
 
             // 명령 완료 → 블록 입력 모드로 복귀
+            surfaceView.pendingCommandSubmitted = false  // 빠른 명령 타이머 취소
+
             if surfaceView.isCommandRunning {
                 surfaceView.isCommandRunning = false; isRunning = false
                 surfaceView.blockInputMode = true
