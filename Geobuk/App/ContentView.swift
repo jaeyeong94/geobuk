@@ -210,8 +210,9 @@ struct ContentView: View {
             // 프로세스 모니터 시작
             processMonitor.startMonitoring()
 
-            // Claude 가격 fetch + 모니터 연결
+            // Claude 가격 fetch + 모니터/설정 연결
             claudeMonitor.pricingManager = pricingManager
+            claudeLaunchSettings.pricingManager = pricingManager
             Task { await pricingManager.fetchPricing() }
 
             // Claude 세션 파일 감시 시작

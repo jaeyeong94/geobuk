@@ -20,8 +20,21 @@ struct ClaudeFlagsView: View {
             Divider()
                 .padding(.vertical, 2)
 
-            // 선택 플래그: Model
-            pickerRow(label: "Model", selection: $settings.model, options: ClaudeLaunchSettings.availableModels)
+            // 선택 플래그: Model (가격 매니저에서 동적 로드)
+            HStack {
+                Text("Model")
+                    .font(.system(size: 11))
+                Spacer()
+                Picker("", selection: $settings.model) {
+                    ForEach(settings.availableModels) { option in
+                        Text(option.label)
+                            .font(.system(size: 10))
+                            .tag(option.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 200)
+            }
 
             // 선택 플래그: Effort
             pickerRow(label: "Effort", selection: $settings.effort, options: ClaudeLaunchSettings.availableEfforts)
