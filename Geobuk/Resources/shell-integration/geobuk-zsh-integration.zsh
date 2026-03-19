@@ -19,7 +19,21 @@ _geobuk_report_tty() {
 
 # 프롬프트 표시 시 호출 (명령 실행 완료 → 유휴 상태)
 _geobuk_precmd() {
+    local exit_code=$?
     _geobuk_send '{"jsonrpc":"2.0","method":"shell.reportState","params":{"surfaceId":"'"$GEOBUK_SURFACE_ID"'","state":"prompt"}}'
+
+    # 블록 하단 구분선 (첫 프롬프트는 스킵)
+    if [[ -n "$_GEOBUK_CMD_RUNNING" ]]; then
+        unset _GEOBUK_CMD_RUNNING
+        # 종료 코드에 따라 색상 변경 (0=성공 초록, 그 외=빨강)
+        if [[ $exit_code -eq 0 ]]; then
+            printf '\e[38;5;238m'
+        else
+            printf '\e[38;5;167m'
+        fi
+        printf '%.0s─' {1..$COLUMNS}
+        printf '\e[0m\n'
+    fi
 }
 
 # 명령 실행 직전 호출
@@ -27,6 +41,16 @@ _geobuk_preexec() {
     # $1 = 실행되는 명령어 전체
     local cmd="${1//\"/\\\"}"
     _geobuk_send '{"jsonrpc":"2.0","method":"shell.reportState","params":{"surfaceId":"'"$GEOBUK_SURFACE_ID"'","state":"running","command":"'"$cmd"'"}}'
+
+    # 블록 상단: 명령어 헤더
+    _GEOBUK_CMD_RUNNING=1
+    printf '\e[38;5;238m'
+    printf '%.0s─' {1..$COLUMNS}
+    printf '\e[0m\n'
+    printf '\e[38;5;114m  ❯ \e[1m%s\e[0m\n' "$1"
+    printf '\e[38;5;238m'
+    printf '%.0s─' {1..$COLUMNS}
+    printf '\e[0m\n'
 }
 
 # JSON-RPC 메시지를 Geobuk 소켓으로 전송 (fire-and-forget)

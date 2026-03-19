@@ -127,7 +127,7 @@ struct SplitPaneView: View {
                     }
             }
         }
-        .border(isFocused ? Color.accentColor : Color.clear, width: 2)
+        .border(isFocused ? Color.gray.opacity(0.4) : Color.gray.opacity(0.15), width: 1)
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
     }
