@@ -133,10 +133,11 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         surfaceConfig.userdata = Unmanaged.passUnretained(self).toOpaque()
         surfaceConfig.scale_factor = Double(NSScreen.main?.backingScaleFactor ?? 2.0)
 
-        // 환경 변수 준비
-        let envVarDefs: [(String, String)] = [
+        // 환경 변수 준비 (메인 init와 동일)
+        var envVarDefs: [(String, String)] = [
             ("GEOBUK_SURFACE_ID", viewId.uuidString),
             ("GEOBUK_SOCKET_PATH", SocketServer.defaultSocketPath),
+            ("ZDOTDIR", BlockModeZshSetup.zdotdir),
         ]
 
         var cKeys: [UnsafeMutablePointer<CChar>] = []
@@ -163,7 +164,8 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
             envVars.append(ghostty_env_var_s(key: cKey, value: cValue))
         }
 
-        let sourceCmd = "[[ -n \"$GEOBUK_SHELL_INTEGRATION\" ]] && source \"$GEOBUK_SHELL_INTEGRATION\" 2>/dev/null; clear\r"
+        // 셸 시작 후 화면 정리 (ZDOTDIR의 .zshrc에서 셸 통합이 로드됨)
+        let sourceCmd = "clear\r"
         let cSourceCmd = strdup(sourceCmd)!
         cKeys.append(cSourceCmd)
         surfaceConfig.initial_input = UnsafePointer(cSourceCmd)
