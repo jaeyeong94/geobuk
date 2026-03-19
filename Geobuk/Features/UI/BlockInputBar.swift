@@ -6,6 +6,9 @@ struct BlockInputBar: View {
     @State private var commandHistory = CommandHistory()
     @FocusState private var isInputFocused: Bool
 
+    /// 현재 표시 중인 인라인 완성 힌트 (입력 뒤에 회색으로 표시)
+    @State private var completionHint: String? = nil
+
     /// 패널이 포커스되어 있는지 (외부에서 전달)
     var paneFocused: Bool = false
 
@@ -74,34 +77,53 @@ struct BlockInputBar: View {
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundColor(.secondary)
 
-            TextField("", text: $persistentText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13, design: .monospaced))
-                .focused($isInputFocused)
-                .onSubmit { submitCommand() }
-                .onKeyPress(.tab) {
-                    handleTab()
-                    return .handled
+            ZStack(alignment: .leading) {
+                // 힌트 텍스트 (회색, 입력 뒤에 표시)
+                if let hint = completionHint, !hint.isEmpty {
+                    Text(persistentText + hint)
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundColor(.secondary.opacity(0.4))
+                        .allowsHitTesting(false)
                 }
-                .onKeyPress(.upArrow) {
-                    handleUpArrow()
-                    return .handled
-                }
-                .onKeyPress(.downArrow) {
-                    handleDownArrow()
-                    return .handled
-                }
-                .onKeyPress(.escape) {
-                    handleEscape()
-                    return .handled
-                }
-                .onKeyPress(characters: .init(charactersIn: "c"), phases: .down) { keyPress in
-                    if keyPress.modifiers.contains(.control) {
-                        handleInterrupt()
+
+                // 실제 입력 필드 (앞에 표시)
+                TextField("", text: $persistentText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, design: .monospaced))
+                    .focused($isInputFocused)
+                    .onSubmit { submitCommand() }
+                    .onChange(of: persistentText) { _, newValue in
+                        updateCompletionHint(for: newValue)
+                    }
+                    .onKeyPress(.tab) {
+                        if acceptCompletionHint() { return .handled }
+                        handleTab()
                         return .handled
                     }
-                    return .ignored
-                }
+                    .onKeyPress(.rightArrow) {
+                        if acceptCompletionHint() { return .handled }
+                        return .ignored
+                    }
+                    .onKeyPress(.upArrow) {
+                        handleUpArrow()
+                        return .handled
+                    }
+                    .onKeyPress(.downArrow) {
+                        handleDownArrow()
+                        return .handled
+                    }
+                    .onKeyPress(.escape) {
+                        handleEscape()
+                        return .handled
+                    }
+                    .onKeyPress(characters: .init(charactersIn: "c"), phases: .down) { keyPress in
+                        if keyPress.modifiers.contains(.control) {
+                            handleInterrupt()
+                            return .handled
+                        }
+                        return .ignored
+                    }
+            }
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
@@ -113,6 +135,7 @@ struct BlockInputBar: View {
         let command = persistentText
         guard !command.isEmpty else { return }
 
+        completionHint = nil
         commandHistory.add(command)
         onSubmit(command)
         persistentText = ""
@@ -124,16 +147,19 @@ struct BlockInputBar: View {
             onSubmit(persistentText)
             persistentText = ""
         }
+        completionHint = nil
         onTab()
     }
 
     private func handleUpArrow() {
+        completionHint = nil
         if let previous = commandHistory.navigateUp() {
             persistentText = previous
         }
     }
 
     private func handleDownArrow() {
+        completionHint = nil
         if let next = commandHistory.navigateDown() {
             persistentText = next
         } else {
@@ -142,12 +168,35 @@ struct BlockInputBar: View {
     }
 
     private func handleEscape() {
+        completionHint = nil
         persistentText = ""
         commandHistory.resetNavigation()
     }
 
     private func handleInterrupt() {
+        completionHint = nil
         persistentText = ""
         onInterrupt()
+    }
+
+    // MARK: - Completion
+
+    /// 입력 변경 시 완성 힌트를 갱신한다
+    private func updateCompletionHint(for text: String) {
+        completionHint = CompletionProvider.suggest(
+            for: text,
+            currentDirectory: currentDirectory,
+            history: commandHistory
+        )
+    }
+
+    /// 현재 힌트가 있으면 수락하여 입력에 적용한다
+    /// - Returns: 힌트를 수락했으면 true, 힌트가 없었으면 false
+    @discardableResult
+    private func acceptCompletionHint() -> Bool {
+        guard let hint = completionHint, !hint.isEmpty else { return false }
+        persistentText = persistentText + hint
+        completionHint = nil
+        return true
     }
 }

@@ -168,7 +168,7 @@ struct SidebarView: View {
                 claudePhase: claudePhase,
                 tokenCount: tokenCount,
                 costUSD: costUSD,
-                listeningPorts: []
+                listeningPorts: shellStateManager?.listeningPortsForSurface(surfaceView?.viewId.uuidString ?? "") ?? []
             )
         }
     }
