@@ -487,11 +487,12 @@ struct ContentView: View {
     private func focusSurfaceView(id: UUID) {
         guard let surfaceView = surfaceViews[id] else { return }
         if surfaceView.isCommandRunning {
-            // 인터렉티브 모드: 터미널에 직접 포커스
-            surfaceView.window?.makeFirstResponder(surfaceView)
+            // 인터렉티브 모드: 터미널에 직접 포커스 (딜레이로 뷰 재생성 대기)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                surfaceView.window?.makeFirstResponder(surfaceView)
+            }
         }
         // 블록 모드: BlockInputBar의 focusTrigger가 처리
-        // (SplitPaneView의 isFocused 변경으로 자동 트리거)
     }
 
     /// 모든 surface의 폰트 크기를 binding action으로 변경

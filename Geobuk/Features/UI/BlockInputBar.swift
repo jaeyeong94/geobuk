@@ -3,7 +3,6 @@ import SwiftUI
 /// 하단 고정 입력창 (Warp 스타일 블록 입력)
 /// 각 터미널 패널 하단에 표시되어 명령어 입력을 제공한다
 struct BlockInputBar: View {
-    @State private var inputText: String = ""
     @State private var commandHistory = CommandHistory()
     @FocusState private var isInputFocused: Bool
 
@@ -12,6 +11,9 @@ struct BlockInputBar: View {
 
     /// 포커스 트리거 (토글할 때마다 포커스 설정)
     var focusTrigger: Bool = false
+
+    /// surfaceView에 저장되는 입력 텍스트 (워크스페이스 전환에도 유지)
+    @Binding var persistentText: String
 
     /// 셸의 현재 작업 디렉토리
     let currentDirectory: String?
@@ -72,7 +74,7 @@ struct BlockInputBar: View {
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundColor(.secondary)
 
-            TextField("", text: $inputText)
+            TextField("", text: $persistentText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13, design: .monospaced))
                 .focused($isInputFocused)
@@ -108,44 +110,44 @@ struct BlockInputBar: View {
     // MARK: - Actions
 
     private func submitCommand() {
-        let command = inputText
+        let command = persistentText
         guard !command.isEmpty else { return }
 
         commandHistory.add(command)
         onSubmit(command)
-        inputText = ""
+        persistentText = ""
     }
 
     private func handleTab() {
         // 현재 입력을 PTY에 보낸 후 Tab 전송
-        if !inputText.isEmpty {
-            onSubmit(inputText)
-            inputText = ""
+        if !persistentText.isEmpty {
+            onSubmit(persistentText)
+            persistentText = ""
         }
         onTab()
     }
 
     private func handleUpArrow() {
         if let previous = commandHistory.navigateUp() {
-            inputText = previous
+            persistentText = previous
         }
     }
 
     private func handleDownArrow() {
         if let next = commandHistory.navigateDown() {
-            inputText = next
+            persistentText = next
         } else {
-            inputText = ""
+            persistentText = ""
         }
     }
 
     private func handleEscape() {
-        inputText = ""
+        persistentText = ""
         commandHistory.resetNavigation()
     }
 
     private func handleInterrupt() {
-        inputText = ""
+        persistentText = ""
         onInterrupt()
     }
 }

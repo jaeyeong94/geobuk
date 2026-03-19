@@ -200,6 +200,9 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     /// 명령 실행 중 (TUI 모드 — 워크스페이스 전환에도 유지)
     var isCommandRunning: Bool = false
 
+    /// 블록 입력창 텍스트 (워크스페이스 전환에도 유지)
+    var pendingInputText: String = ""
+
     /// 블록 입력 모드일 때 터미널 직접 입력 비활성화
     var blockInputMode: Bool = false {
         didSet {

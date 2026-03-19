@@ -115,6 +115,10 @@ struct SplitPaneView: View {
                         BlockInputBar(
                             paneFocused: isFocused,
                             focusTrigger: inputFocusTrigger,
+                            persistentText: Binding(
+                                get: { surfaceView.pendingInputText },
+                                set: { surfaceView.pendingInputText = $0 }
+                            ),
                             currentDirectory: surfaceView.currentDirectory,
                             onSubmit: { command in
                                 surfaceView.sendText(command)
