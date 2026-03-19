@@ -42,6 +42,9 @@ _geobuk_preexec() {
     local cmd="${1//\"/\\\"}"
     _geobuk_send '{"jsonrpc":"2.0","method":"shell.reportState","params":{"surfaceId":"'"$GEOBUK_SURFACE_ID"'","state":"running","command":"'"$cmd"'"}}'
 
+    # 디버그: preexec 호출 확인
+    echo "preexec:$1" >> /tmp/geobuk-preexec-debug
+
     # 블록 구분: 명령어 헤더
     _GEOBUK_CMD_RUNNING=1
     local w=$(_geobuk_cols)
@@ -101,3 +104,6 @@ preexec_functions+=(_geobuk_preexec)
 
 # 최초 로드 시 TTY 보고
 _geobuk_report_tty
+
+# 디버그: 통합 스크립트 로드 확인
+touch /tmp/geobuk-integration-loaded

@@ -75,8 +75,7 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         // 셸 통합 스크립트 경로도 환경 변수로 설정
         if let integrationPath = Bundle.main.path(
             forResource: "geobuk-zsh-integration",
-            ofType: "zsh",
-            inDirectory: "shell-integration"
+            ofType: "zsh"
         ) {
             let cKey = strdup("GEOBUK_SHELL_INTEGRATION")!
             let cValue = strdup(integrationPath)!
@@ -150,8 +149,7 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
 
         if let integrationPath = Bundle.main.path(
             forResource: "geobuk-zsh-integration",
-            ofType: "zsh",
-            inDirectory: "shell-integration"
+            ofType: "zsh"
         ) {
             let cKey = strdup("GEOBUK_SHELL_INTEGRATION")!
             let cValue = strdup(integrationPath)!
