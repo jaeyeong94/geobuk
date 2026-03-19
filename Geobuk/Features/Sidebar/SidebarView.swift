@@ -122,6 +122,7 @@ struct SidebarView: View {
             if let watcher = claudeFileWatcher, !watcher.activeSessions.isEmpty {
                 Divider()
                 fileWatcherSection(watcher: watcher)
+                    .padding(.bottom, 16)
             }
         }
         .frame(minWidth: 160, idealWidth: 200, maxWidth: 280)
