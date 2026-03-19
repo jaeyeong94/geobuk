@@ -62,6 +62,35 @@ final class BlockModeZshSetup {
 
         # Geobuk 셸 통합 로드
         [[ -n "$GEOBUK_SHELL_INTEGRATION" ]] && source "$GEOBUK_SHELL_INTEGRATION" 2>/dev/null
+
+        # 웰컴 배너
+        echo ""
+        printf '\e[38;5;114m'
+        echo '            __'
+        echo ' .-----.  / _)'
+        echo '/  ___  \/  /'
+        echo '|  /   \   /'
+        echo '|  |    | |'
+        echo ' \ \___/ /'
+        echo "  '-----'"
+        echo ''
+        echo '╔══════════════════════════════════════╗'
+        echo '║  Geobuk Terminal  v0.1               ║'
+        echo '╠══════════════════════════════════════╣'
+        echo '║                                      ║'
+        echo '║  Cmd+D        Split horizontally     ║'
+        echo '║  Cmd+Shift+D  Split vertically       ║'
+        echo '║  Cmd+W        Close pane             ║'
+        echo '║  Cmd+T        New workspace          ║'
+        echo '║  Cmd+,        Settings               ║'
+        echo '║  Cmd+B        Toggle sidebar         ║'
+        echo '║  Cmd+Opt+Arrows  Navigate panes      ║'
+        echo '║  Cmd+Shift+C  New Claude session     ║'
+        echo '║                                      ║'
+        echo '║  Type commands below ↓               ║'
+        echo '╚══════════════════════════════════════╝'
+        printf '\e[0m'
+        echo ''
         """###
         try? zshrc.write(toFile: dir + "/.zshrc", atomically: true, encoding: .utf8)
 
