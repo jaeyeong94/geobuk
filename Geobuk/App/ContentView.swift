@@ -217,7 +217,7 @@ struct ContentView: View {
 
             // Claude 세션 파일 감시 시작
             claudeFileWatcher.onTranscriptEvent = { sessionId, event in
-                claudeMonitor.processTranscriptEvent(event)
+                claudeMonitor.processTranscriptEvent(event, sessionId: sessionId)
             }
             claudeFileWatcher.startWatching()
 

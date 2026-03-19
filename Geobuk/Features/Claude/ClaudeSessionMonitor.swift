@@ -6,8 +6,14 @@ import Observation
 @MainActor
 @Observable
 final class ClaudeSessionMonitor {
-    /// 세션 상태 (외부에서 UI 바인딩용으로 접근)
+    /// 단일 세션 상태 (하위 호환용)
     let sessionState: ClaudeSessionState
+
+    /// 세션별 독립 상태 (sessionId → state)
+    private(set) var sessionStates: [String: ClaudeSessionState] = [:]
+
+    /// 세션별 모델 이름
+    private(set) var sessionModels: [String: String] = [:]
 
     /// 가격 매니저
     var pricingManager: ClaudePricingManager?
@@ -113,28 +119,40 @@ final class ClaudeSessionMonitor {
 
     // MARK: - 트랜스크립트 이벤트 처리
 
-    /// Claude 트랜스크립트 JSONL 이벤트를 처리한다
-    /// stream-json과 다른 포맷이므로 변환하여 sessionState에 전달
-    func processTranscriptEvent(_ event: [String: Any]) {
+    /// Claude 트랜스크립트 JSONL 이벤트를 처리한다 (세션별 독립 상태)
+    func processTranscriptEvent(_ event: [String: Any], sessionId: String? = nil) {
         guard let type = event["type"] as? String else { return }
 
         if !isMonitoring {
             startMonitoring()
         }
 
-        // 세션 ID 설정
-        if let sessionId = event["sessionId"] as? String,
-           sessionState.sessionId == nil {
-            sessionState.processEvent(.sessionInit(sessionId: sessionId))
+        // 세션 ID 결정
+        let sid = sessionId ?? event["sessionId"] as? String ?? "unknown"
+
+        // 세션별 상태 가져오기 (없으면 생성)
+        let state: ClaudeSessionState
+        if let existing = sessionStates[sid] {
+            state = existing
+        } else {
+            let newState = ClaudeSessionState()
+            sessionStates[sid] = newState
+            state = newState
         }
+
+        // 세션 ID 설정
+        if state.sessionId == nil {
+            state.processEvent(.sessionInit(sessionId: sid))
+        }
+
+        // 단일 상태도 마지막 활성 세션으로 업데이트 (하위 호환)
+        let _ = { self.sessionState.processEvent(.sessionInit(sessionId: sid)) }()
 
         switch type {
         case "user":
-            // 사용자 입력 → 세션 활성
-            sessionState.processEvent(.sessionInit(sessionId: event["sessionId"] as? String ?? ""))
+            state.processEvent(.sessionInit(sessionId: sid))
 
         case "assistant":
-            // Claude 응답
             if let message = event["message"] as? [String: Any],
                let content = message["content"] as? [[String: Any]] {
                 for block in content {
@@ -142,17 +160,14 @@ final class ClaudeSessionMonitor {
                         switch blockType {
                         case "text":
                             let text = block["text"] as? String ?? ""
-                            sessionState.processEvent(.assistantMessage(text: text))
-
+                            state.processEvent(.assistantMessage(text: text))
                         case "tool_use":
                             let name = block["name"] as? String ?? ""
                             let id = block["id"] as? String ?? ""
-                            sessionState.processEvent(.toolUse(id: id, name: name, input: ""))
-
+                            state.processEvent(.toolUse(id: id, name: name, input: ""))
                         case "tool_result":
                             let id = block["tool_use_id"] as? String ?? ""
-                            sessionState.processEvent(.toolResult(id: id, content: ""))
-
+                            state.processEvent(.toolResult(id: id, content: ""))
                         default:
                             break
                         }
@@ -160,13 +175,14 @@ final class ClaudeSessionMonitor {
                 }
             }
 
-            // 모델 감지 (message.model)
+            // 모델 감지
             if let message = event["message"] as? [String: Any],
                let model = message["model"] as? String {
                 detectedModel = model
+                sessionModels[sid] = model
             }
 
-            // 토큰 사용량 (message.usage에 위치)
+            // 토큰 사용량
             let usage: [String: Any]? =
                 (event["message"] as? [String: Any])?["usage"] as? [String: Any]
                 ?? event["usage"] as? [String: Any]
@@ -176,10 +192,10 @@ final class ClaudeSessionMonitor {
                 let output = usage["output_tokens"] as? Int ?? 0
                 let cacheRead = usage["cache_read_input_tokens"] as? Int ?? 0
                 let cacheWrite = usage["cache_creation_input_tokens"] as? Int ?? 0
-                sessionState.processEvent(.usage(inputTokens: input + cacheRead + cacheWrite, outputTokens: output))
+                state.processEvent(.usage(inputTokens: input + cacheRead + cacheWrite, outputTokens: output))
 
-                // 모델별 가격으로 비용 재계산
-                if let pricing = pricingManager, let model = detectedModel {
+                let model = sessionModels[sid] ?? detectedModel
+                if let pricing = pricingManager, let model {
                     let cost = pricing.calculateCost(
                         model: model,
                         inputTokens: input,
@@ -187,7 +203,7 @@ final class ClaudeSessionMonitor {
                         cacheReadTokens: cacheRead,
                         cacheWriteTokens: cacheWrite
                     )
-                    sessionState.addCost(cost)
+                    state.addCost(cost)
                 }
             }
 
@@ -196,9 +212,9 @@ final class ClaudeSessionMonitor {
                 switch subtype {
                 case "tool_result":
                     let id = event["toolUseID"] as? String ?? ""
-                    sessionState.processEvent(.toolResult(id: id, content: ""))
+                    state.processEvent(.toolResult(id: id, content: ""))
                 case "success", "error":
-                    sessionState.processEvent(.result(text: subtype))
+                    state.processEvent(.result(text: subtype))
                 default:
                     break
                 }
@@ -206,12 +222,16 @@ final class ClaudeSessionMonitor {
 
         case "system":
             if let subtype = event["subtype"] as? String, subtype == "turn_duration" {
-                // 턴 완료 → 다시 대기 상태
-                sessionState.processEvent(.result(text: "turn complete"))
+                state.processEvent(.result(text: "turn complete"))
             }
 
         default:
             break
         }
+    }
+
+    /// 특정 세션의 상태 조회
+    func getState(for sessionId: String) -> ClaudeSessionState? {
+        sessionStates[sessionId]
     }
 }

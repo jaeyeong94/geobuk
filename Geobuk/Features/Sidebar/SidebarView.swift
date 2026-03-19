@@ -275,16 +275,23 @@ struct SidebarView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                // 세션 상태 표시 (claudeMonitor의 상태를 활용)
-                if let monitor = claudeMonitor, monitor.sessionState.phase != .idle {
+                // 세션별 독립 상태 표시
+                if let monitor = claudeMonitor,
+                   let sessionState = monitor.getState(for: session.sessionId),
+                   sessionState.phase != .idle {
                     HStack(spacing: 4) {
-                        Text(sessionStatusText(monitor: monitor))
+                        Text(phaseText(sessionState.phase, toolName: sessionState.currentToolName))
                             .font(.system(size: 9))
                             .foregroundColor(.secondary)
-                        if monitor.sessionState.tokenUsage.totalTokens > 0 {
-                            Text(formatTokenCount(monitor.sessionState.tokenUsage.totalTokens))
+                        if sessionState.tokenUsage.totalTokens > 0 {
+                            Text(formatTokenCount(sessionState.tokenUsage.totalTokens))
                                 .font(.system(size: 9, design: .monospaced))
                                 .foregroundColor(.secondary)
+                        }
+                        if sessionState.costUSD > 0 {
+                            Text(String(format: "$%.2f", sessionState.costUSD))
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(.orange)
                         }
                     }
                 }
@@ -304,10 +311,11 @@ struct SidebarView: View {
         }
     }
 
-    /// 세션 상태에 따른 색상
+    /// 세션 상태에 따른 색상 (세션별 독립)
     private func sessionStatusColor(for session: ClaudeFileSession) -> Color {
-        guard let monitor = claudeMonitor else { return .green }
-        switch monitor.sessionState.phase {
+        guard let monitor = claudeMonitor,
+              let state = monitor.getState(for: session.sessionId) else { return .green }
+        switch state.phase {
         case .responding: return .green
         case .toolExecuting: return .blue
         case .waitingForInput: return .yellow
@@ -316,15 +324,12 @@ struct SidebarView: View {
         }
     }
 
-    /// 세션 상태 텍스트
-    private func sessionStatusText(monitor: ClaudeSessionMonitor) -> String {
-        let state = monitor.sessionState
-        switch state.phase {
+    /// phase를 표시 텍스트로 변환
+    private func phaseText(_ phase: AISessionPhase, toolName: String?) -> String {
+        switch phase {
         case .responding: return "Responding"
         case .toolExecuting:
-            if let tool = state.currentToolName {
-                return "ToolExecuting: \(tool)"
-            }
+            if let tool = toolName { return "Tool: \(tool)" }
             return "ToolExecuting"
         case .waitingForInput: return "Waiting for input"
         case .sessionActive: return "Active"
