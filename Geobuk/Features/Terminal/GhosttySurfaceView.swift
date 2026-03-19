@@ -205,7 +205,15 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     // MARK: - View Lifecycle
 
     /// 블록 입력 모드일 때 터미널 직접 입력 비활성화
-    var blockInputMode: Bool = false
+    var blockInputMode: Bool = false {
+        didSet {
+            if blockInputMode {
+                // 포커스 해제 + 커서 비활성화
+                window?.makeFirstResponder(nil)
+                setFocusState(false)
+            }
+        }
+    }
 
     override var acceptsFirstResponder: Bool { !blockInputMode }
 
@@ -281,6 +289,7 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyDown(with event: NSEvent) {
+        guard !blockInputMode else { return }
         guard let surface else { return }
 
         // Ghostty 패턴: keyDown 중에만 accumulator 활성화
@@ -311,6 +320,7 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyUp(with event: NSEvent) {
+        guard !blockInputMode else { return }
         guard let surface else { return }
         var keyEvent = event.ghosttyKeyEvent(action: GHOSTTY_ACTION_RELEASE)
         _ = ghostty_surface_key(surface, keyEvent)

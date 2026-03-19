@@ -55,6 +55,22 @@ TRAPWINCH() {
     :
 }
 
+# 블록 입력 모드: 셸 프롬프트 숨김
+# Geobuk의 BlockInputBar가 프롬프트 역할을 대신함
+_geobuk_saved_PS1="$PS1"
+_geobuk_saved_RPS1="$RPS1"
+PS1='$ '
+RPS1=''
+
+# powerlevel10k 비활성화 (블록 입력 모드에서는 불필요)
+if [[ -n "$POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD" ]] || typeset -f prompt_powerlevel9k_setup &>/dev/null || [[ "$ZSH_THEME" == "powerlevel10k"* ]]; then
+    POWERLEVEL9K_DISABLE_RPROMPT=true
+    POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=()
+    POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=()
+    PS1='$ '
+    RPS1=''
+fi
+
 # zsh 훅 등록
 precmd_functions+=(_geobuk_precmd)
 precmd_functions+=(_geobuk_precmd_prompt_mark)
