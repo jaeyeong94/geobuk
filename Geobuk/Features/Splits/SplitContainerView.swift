@@ -54,9 +54,6 @@ struct SplitPaneView: View {
     /// 셸 초기화 오버레이 표시 여부
     @State private var showInitOverlay = true
 
-    /// 명령 실행 중 (TUI 모드 — 터미널 직접 입력)
-    @State private var isCommandRunning = false
-
     /// 입력창 포커스 트리거 (토글할 때마다 포커스)
     @State private var inputFocusTrigger = false
 
@@ -71,7 +68,7 @@ struct SplitPaneView: View {
                                 surfaceView: surfaceView
                             )
                             .onAppear {
-                                if !isCommandRunning { surfaceView.blockInputMode = true }
+                                if !surfaceView.isCommandRunning { surfaceView.blockInputMode = true }
                             }
 
                             // 셸 영역 클릭 처리
@@ -79,7 +76,7 @@ struct SplitPaneView: View {
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     onTap()
-                                    if isCommandRunning {
+                                    if surfaceView.isCommandRunning {
                                         // 인터렉티브 모드: 터미널에 포커스 복원 (앱 전환 후 복귀 대응)
                                         surfaceView.window?.makeFirstResponder(surfaceView)
                                     } else {
@@ -138,7 +135,7 @@ struct SplitPaneView: View {
                                     }
 
                                     // 느린 명령: TUI 모드로 전환
-                                    isCommandRunning = true
+                                    surfaceView.isCommandRunning = true
                                     surfaceView.blockInputMode = false
                                     surfaceView.window?.makeFirstResponder(surfaceView)
 
@@ -152,7 +149,7 @@ struct SplitPaneView: View {
                                     }
 
                                     // 블록 입력 모드 복귀
-                                    isCommandRunning = false
+                                    surfaceView.isCommandRunning = false
                                     surfaceView.blockInputMode = true
                                     // 입력창에 포커스 복귀
                                     inputFocusTrigger.toggle()
@@ -167,9 +164,9 @@ struct SplitPaneView: View {
                                 surfaceView.sendKeyPress(keyCode: 8, char: "c", mods: GHOSTTY_MODS_CTRL)
                             }
                         )
-                        .opacity(isCommandRunning ? 0 : 1)
-                        .frame(height: isCommandRunning ? 0 : nil)
-                        .animation(.easeInOut(duration: 0.15), value: isCommandRunning)
+                        .opacity(surfaceView.isCommandRunning ? 0 : 1)
+                        .frame(height: surfaceView.isCommandRunning ? 0 : nil)
+                        .animation(.easeInOut(duration: 0.15), value: surfaceView.isCommandRunning)
                     }
                 } else {
                     Color.black
