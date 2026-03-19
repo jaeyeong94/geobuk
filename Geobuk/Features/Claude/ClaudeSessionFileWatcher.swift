@@ -21,6 +21,9 @@ final class ClaudeSessionFileWatcher {
     /// 이벤트 콜백
     var onTranscriptEvent: ((_ sessionId: String, _ event: [String: Any]) -> Void)?
 
+    /// 세션 종료 콜백
+    var onSessionEnded: ((_ sessionId: String) -> Void)?
+
     init(sessionsDir: String? = nil) {
         self.sessionsDir = sessionsDir ?? (NSHomeDirectory() + "/.claude/sessions")
     }
@@ -96,13 +99,16 @@ final class ClaudeSessionFileWatcher {
             }
         }
 
-        // 종료된 세션의 tailer 정리
+        // 종료된 세션 정리
         let activeIds = Set(foundSessions.map(\.sessionId))
-        for (sessionId, tailer) in tailers {
-            if !activeIds.contains(sessionId) {
+        let previousIds = Set(activeSessions.map(\.sessionId))
+        let endedIds = previousIds.subtracting(activeIds)
+
+        for sessionId in endedIds {
+            if let tailer = tailers.removeValue(forKey: sessionId) {
                 Task { await tailer.stopTailing() }
-                tailers.removeValue(forKey: sessionId)
             }
+            onSessionEnded?(sessionId)
         }
 
         activeSessions = foundSessions

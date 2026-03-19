@@ -234,4 +234,10 @@ final class ClaudeSessionMonitor {
     func getState(for sessionId: String) -> ClaudeSessionState? {
         sessionStates[sessionId]
     }
+
+    /// 종료된 세션 정리
+    func removeSession(_ sessionId: String) {
+        sessionStates.removeValue(forKey: sessionId)
+        sessionModels.removeValue(forKey: sessionId)
+    }
 }

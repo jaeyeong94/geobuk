@@ -219,6 +219,9 @@ struct ContentView: View {
             claudeFileWatcher.onTranscriptEvent = { sessionId, event in
                 claudeMonitor.processTranscriptEvent(event, sessionId: sessionId)
             }
+            claudeFileWatcher.onSessionEnded = { sessionId in
+                claudeMonitor.removeSession(sessionId)
+            }
             claudeFileWatcher.startWatching()
 
             // 자동 저장 타이머 시작 (30초마다)
