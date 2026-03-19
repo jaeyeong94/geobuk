@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var lineHeight: Double = 1.0
     @State private var processMonitor = PaneProcessMonitor()
     @State private var claudeLaunchSettings = ClaudeLaunchSettings()
+    @State private var pricingManager = ClaudePricingManager()
 
     var body: some View {
         Group {
@@ -208,6 +209,10 @@ struct ContentView: View {
 
             // 프로세스 모니터 시작
             processMonitor.startMonitoring()
+
+            // Claude 가격 fetch + 모니터 연결
+            claudeMonitor.pricingManager = pricingManager
+            Task { await pricingManager.fetchPricing() }
 
             // Claude 세션 파일 감시 시작
             claudeFileWatcher.onTranscriptEvent = { sessionId, event in

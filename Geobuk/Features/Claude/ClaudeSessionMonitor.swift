@@ -9,6 +9,12 @@ final class ClaudeSessionMonitor {
     /// 세션 상태 (외부에서 UI 바인딩용으로 접근)
     let sessionState: ClaudeSessionState
 
+    /// 가격 매니저
+    var pricingManager: ClaudePricingManager?
+
+    /// 감지된 모델 이름
+    private(set) var detectedModel: String?
+
     /// 현재 모니터링 중인지 여부
     private(set) var isMonitoring: Bool = false
 
@@ -154,6 +160,12 @@ final class ClaudeSessionMonitor {
                 }
             }
 
+            // 모델 감지 (message.model)
+            if let message = event["message"] as? [String: Any],
+               let model = message["model"] as? String {
+                detectedModel = model
+            }
+
             // 토큰 사용량 (message.usage에 위치)
             let usage: [String: Any]? =
                 (event["message"] as? [String: Any])?["usage"] as? [String: Any]
@@ -165,6 +177,18 @@ final class ClaudeSessionMonitor {
                 let cacheRead = usage["cache_read_input_tokens"] as? Int ?? 0
                 let cacheWrite = usage["cache_creation_input_tokens"] as? Int ?? 0
                 sessionState.processEvent(.usage(inputTokens: input + cacheRead + cacheWrite, outputTokens: output))
+
+                // 모델별 가격으로 비용 재계산
+                if let pricing = pricingManager, let model = detectedModel {
+                    let cost = pricing.calculateCost(
+                        model: model,
+                        inputTokens: input,
+                        outputTokens: output,
+                        cacheReadTokens: cacheRead,
+                        cacheWriteTokens: cacheWrite
+                    )
+                    sessionState.addCost(cost)
+                }
             }
 
         case "result":

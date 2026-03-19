@@ -106,12 +106,17 @@ final class ClaudeSessionState: AISessionMonitor, @unchecked Sendable {
 
     // MARK: - Private
 
-    /// 현재 토큰 사용량 기반으로 비용을 재계산한다
+    /// 현재 토큰 사용량 기반으로 비용을 재계산한다 (하드코딩 단가, fallback)
     private func recalculateCost() {
         costUSD = Double(tokenUsage.inputTokens) * Pricing.inputPerToken
             + Double(tokenUsage.outputTokens) * Pricing.outputPerToken
             + Double(tokenUsage.cacheReadTokens) * Pricing.cacheReadPerToken
             + Double(tokenUsage.cacheWriteTokens) * Pricing.cacheWritePerToken
+    }
+
+    /// 외부에서 계산된 비용을 누적한다 (ClaudePricingManager 연동 시 사용)
+    func addCost(_ amount: Double) {
+        costUSD += amount
     }
 }
 
