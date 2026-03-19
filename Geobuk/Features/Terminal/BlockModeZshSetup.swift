@@ -2,6 +2,7 @@ import Foundation
 
 /// 블록 입력 모드용 ZDOTDIR 설정
 /// 임시 디렉토리에 커스텀 .zshrc를 생성하여 프롬프트 테마를 비활성화
+/// .zshrc를 수정/필터링하지 않고, 로드 후 프롬프트만 비활성화
 final class BlockModeZshSetup {
     /// 임시 ZDOTDIR 경로 (앱 수명 동안 유지)
     static let zdotdir: String = {
@@ -9,46 +10,46 @@ final class BlockModeZshSetup {
         let fm = FileManager.default
         try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
-        // 커스텀 .zshrc 생성
         let zshrc = ###"""
         # Geobuk Block Mode .zshrc
-        # 사용자 설정을 로드하되 프롬프트 테마를 완전 비활성화
+        # 사용자 .zshrc를 그대로 로드한 후, 프롬프트만 비활성화
 
-        # p10k instant prompt 차단 (source 전에 함수 재정의)
+        # p10k instant prompt 차단
         typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
         typeset -g POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
+        export GEOBUK_BLOCK_MODE=1
 
-        # 사용자의 .zshrc를 로드하되, p10k/프롬프트 관련 부분을 필터링
+        # 사용자 .zshrc 그대로 로드 (alias, PATH, 플러그인 등 모두 유지)
         ZDOTDIR="$HOME"
-        if [[ -f "$HOME/.zshrc" ]]; then
-            # .zshrc에서 프롬프트 테마 관련 줄을 제거하고 실행
-            eval "$(sed \
-                -e '/p10k-instant-prompt/d' \
-                -e '/source.*p10k\.zsh/d' \
-                -e '/ZSH_THEME=/s/.*/ZSH_THEME=""/' \
-                "$HOME/.zshrc" 2>/dev/null)"
-        fi
+        [[ -f "$HOME/.zshrc" ]] && source "$HOME/.zshrc"
 
-        # 프롬프트 시스템 완전 리셋
+        # ── 로드 완료 후 프롬프트 비활성화 ──
+
+        # zsh 프롬프트 시스템 비활성화
         prompt off 2>/dev/null
-        PS1='$ '
-        RPS1=''
-        RPROMPT=''
-        PROMPT='$ '
 
-        # p10k 함수가 로드되었다면 제거
+        # 프롬프트 관련 함수 제거 (테마 무관)
         unfunction prompt_powerlevel9k_setup 2>/dev/null
         unfunction p10k 2>/dev/null
 
-        # precmd/preexec에서 p10k 관련 함수 제거
+        # precmd/preexec에서 프롬프트 관련 함수 제거
+        # 패턴 매칭으로 모든 프롬프트 테마 커버
         precmd_functions=(${precmd_functions:#*powerlevel*})
         precmd_functions=(${precmd_functions:#*p9k*})
         precmd_functions=(${precmd_functions:#*p10k*})
+        precmd_functions=(${precmd_functions:#*prompt*})
+        precmd_functions=(${precmd_functions:#*starship*})
         preexec_functions=(${preexec_functions:#*powerlevel*})
         preexec_functions=(${preexec_functions:#*p9k*})
+        preexec_functions=(${preexec_functions:#*starship*})
 
-        # 프롬프트 강제 유지 (precmd 맨 앞에서 실행)
-        _geobuk_force_prompt() { PS1='$ '; RPS1=''; RPROMPT=''; PROMPT='$ '; }
+        # 최소 프롬프트 강제 (precmd 맨 앞)
+        _geobuk_force_prompt() {
+            PS1='$ '
+            RPS1=''
+            RPROMPT=''
+            PROMPT='$ '
+        }
         precmd_functions=(_geobuk_force_prompt "${precmd_functions[@]}")
 
         # Geobuk 셸 통합 로드
@@ -56,12 +57,10 @@ final class BlockModeZshSetup {
         """###
         try? zshrc.write(toFile: dir + "/.zshrc", atomically: true, encoding: .utf8)
 
-        // .zshenv도 생성 (p10k instant prompt 차단)
         let zshenv = """
         # Geobuk Block Mode .zshenv
-        # p10k instant prompt 비활성화
         typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
-        # 사용자의 .zshenv 로드
+        export GEOBUK_BLOCK_MODE=1
         [[ -f "$HOME/.zshenv" ]] && source "$HOME/.zshenv"
         """
         try? zshenv.write(toFile: dir + "/.zshenv", atomically: true, encoding: .utf8)
