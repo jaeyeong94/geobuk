@@ -425,6 +425,8 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         text.withCString { ptr in
             ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
         }
+        // 블록 모드에서는 커서를 숨기기 위해 unfocus 유지
+        if blockInputMode { setFocusState(false) }
     }
 
     /// macOS 하드웨어 키코드로 키를 press+release 전송
@@ -448,6 +450,9 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         // Release
         event.action = GHOSTTY_ACTION_RELEASE
         _ = ghostty_surface_key(surface, event)
+
+        // 블록 모드에서는 커서를 숨기기 위해 unfocus 유지
+        if blockInputMode { setFocusState(false) }
     }
 
     // MARK: - Binding Actions
