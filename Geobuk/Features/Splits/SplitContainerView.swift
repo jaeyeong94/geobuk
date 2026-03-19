@@ -102,27 +102,37 @@ struct SplitPaneView: View {
                             paneFocused: isFocused,
                             currentDirectory: surfaceView.currentDirectory,
                             onSubmit: { command in
-                                // 명령 실행 중: 터미널 직접 입력 활성화 (TUI 앱 대응)
-                                isCommandRunning = true
-                                surfaceView.blockInputMode = false
-                                surfaceView.window?.makeFirstResponder(surfaceView)
-
                                 surfaceView.sendText(command)
                                 surfaceView.sendKeyPress(keyCode: 36, char: "\r")
 
-                                // precmd 복귀 감지: 셸이 precmd에서 시그널 파일을 터치
+                                // precmd 복귀 감지
                                 let signalFile = "/tmp/geobuk-precmd-\(surfaceView.viewId.uuidString)"
                                 try? FileManager.default.removeItem(atPath: signalFile)
 
                                 Task { @MainActor in
-                                    // 시그널 파일이 생성될 때까지 대기 (precmd 실행 = 명령 완료)
-                                    for _ in 0..<6000 { // 최대 10분
+                                    // 500ms 대기 — 빠른 명령이면 이미 완료됨
+                                    try? await Task.sleep(nanoseconds: 500_000_000)
+
+                                    if FileManager.default.fileExists(atPath: signalFile) {
+                                        // 빠른 명령: 이미 완료 → 입력창 유지
+                                        try? FileManager.default.removeItem(atPath: signalFile)
+                                        return
+                                    }
+
+                                    // 느린 명령: TUI 모드로 전환
+                                    isCommandRunning = true
+                                    surfaceView.blockInputMode = false
+                                    surfaceView.window?.makeFirstResponder(surfaceView)
+
+                                    // 완료 대기
+                                    for _ in 0..<6000 {
                                         try? await Task.sleep(nanoseconds: 100_000_000)
                                         if FileManager.default.fileExists(atPath: signalFile) {
                                             try? FileManager.default.removeItem(atPath: signalFile)
                                             break
                                         }
                                     }
+
                                     // 블록 입력 모드 복귀
                                     isCommandRunning = false
                                     surfaceView.blockInputMode = true
