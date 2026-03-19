@@ -87,14 +87,17 @@ struct BlockInputBar: View {
                 }
 
                 // 실제 입력 필드 (앞에 표시)
-                TextField("", text: $persistentText)
+                TextField("", text: Binding(
+                    get: { persistentText },
+                    set: { newValue in
+                        persistentText = newValue
+                        updateCompletionHint(for: newValue)
+                    }
+                ))
                     .textFieldStyle(.plain)
                     .font(.system(size: 13, design: .monospaced))
                     .focused($isInputFocused)
                     .onSubmit { submitCommand() }
-                    .onChange(of: persistentText) { _, newValue in
-                        updateCompletionHint(for: newValue)
-                    }
                     .onKeyPress(.tab) {
                         if acceptCompletionHint() { return .handled }
                         handleTab()
