@@ -67,16 +67,22 @@ final class GhosttyApp {
                 if target.tag == GHOSTTY_TARGET_SURFACE {
                     let surface = target.target.surface
                     if let userdata = ghostty_surface_userdata(surface) {
-                        let surfaceView = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
+                        // pwd 문자열을 콜백 스코프 안에서 복사 (포인터 유효 범위 보장)
                         if let pwdStr = action.action.pwd.pwd {
                             let pwd = String(cString: pwdStr)
                             DispatchQueue.main.async {
+                                // main thread에서 surfaceView 유효성 검증
+                                // surface가 이미 해제되었으면 userdata가 무효 → 건너뜀
+                                guard ghostty_surface_userdata(surface) != nil else { return }
+                                let surfaceView = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
+                                guard surfaceView.hasSurface else { return }
                                 surfaceView.currentDirectory = pwd
                             }
                         }
                     }
                 }
-                return true
+                // false 반환: Ghostty 내부에서도 PWD를 처리하도록 허용 (타이틀 바 등)
+                return false
             }
             return false
         }
