@@ -59,6 +59,22 @@ struct SplitPaneView: View {
                     TerminalSurfaceRepresentable(
                         surfaceView: surfaceView
                     )
+
+                    // 셸 초기화 완료 전까지 오버레이 표시
+                    // currentDirectory가 설정되면 셸이 준비된 것으로 판단 (OSC 7 수신)
+                    if surfaceView.currentDirectory == nil {
+                        Color.black
+                            .overlay {
+                                VStack(spacing: 8) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                    Text("Initializing shell...")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .transition(.opacity)
+                    }
                 } else {
                     Color.black
                         .overlay {
