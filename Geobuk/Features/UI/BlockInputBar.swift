@@ -30,16 +30,7 @@ struct BlockInputBar: View {
             // 입력 필드
             inputLine
         }
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                )
-        )
-        .padding(.horizontal, 8)
-        .padding(.bottom, 8)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
         .task(id: paneFocused) {
             if paneFocused {
                 // 약간의 지연 후 포커스 (뷰 계층 안정화 대기)

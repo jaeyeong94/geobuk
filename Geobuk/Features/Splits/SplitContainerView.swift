@@ -97,9 +97,21 @@ struct SplitPaneView: View {
                             paneFocused: isFocused,
                             currentDirectory: surfaceView.currentDirectory,
                             onSubmit: { command in
-                                // 명령어 텍스트 전송 후 Enter 키 이벤트 전송
+                                // 구분선 + 명령어 헤더 출력 (ANSI 이스케이프)
+                                let cols = surfaceView.terminalSize?.columns ?? 80
+                                let separator = String(repeating: "─", count: Int(cols))
+                                // 구분선
+                                surfaceView.sendText("printf '\\e[38;5;238m\(separator)\\e[0m\\n'")
+                                surfaceView.sendKeyPress(keyCode: 36, char: "\r")
+                                // 명령어 헤더 (배경색 + 초록 텍스트)
+                                let escapedCmd = command.replacingOccurrences(of: "'", with: "'\\''")
+                                surfaceView.sendText("printf '  \\e[48;5;236m\\e[38;5;114m ❯ \\e[1m\(escapedCmd) \\e[0m\\n'")
+                                surfaceView.sendKeyPress(keyCode: 36, char: "\r")
+                                // 구분선
+                                surfaceView.sendText("printf '\\e[38;5;238m\(separator)\\e[0m\\n'")
+                                surfaceView.sendKeyPress(keyCode: 36, char: "\r")
+                                // 실제 명령어 실행
                                 surfaceView.sendText(command)
-                                // macOS Enter keycode = 36
                                 surfaceView.sendKeyPress(keyCode: 36, char: "\r")
                             },
                             onTab: {
