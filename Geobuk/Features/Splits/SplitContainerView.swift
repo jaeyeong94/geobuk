@@ -94,6 +94,7 @@ struct SplitPaneView: View {
                         }
 
                         BlockInputBar(
+                            paneFocused: isFocused,
                             currentDirectory: surfaceView.currentDirectory,
                             onSubmit: { command in
                                 // 명령어 텍스트 전송 후 Enter 키 이벤트 전송

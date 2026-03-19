@@ -7,6 +7,9 @@ struct BlockInputBar: View {
     @State private var commandHistory = CommandHistory()
     @FocusState private var isInputFocused: Bool
 
+    /// 패널이 포커스되어 있는지 (외부에서 전달)
+    var paneFocused: Bool = false
+
     /// 셸의 현재 작업 디렉토리
     let currentDirectory: String?
 
@@ -37,6 +40,12 @@ struct BlockInputBar: View {
         )
         .padding(.horizontal, 8)
         .padding(.bottom, 8)
+        .onChange(of: paneFocused) { _, focused in
+            if focused { isInputFocused = true }
+        }
+        .onAppear {
+            if paneFocused { isInputFocused = true }
+        }
     }
 
     // MARK: - Subviews
