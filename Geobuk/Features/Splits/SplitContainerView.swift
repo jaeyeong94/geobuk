@@ -51,6 +51,9 @@ struct SplitPaneView: View {
     let onTap: () -> Void
     let surfaceViewProvider: (UUID) -> GhosttySurfaceView?
 
+    /// 셸 초기화 오버레이 표시 여부
+    @State private var showInitOverlay = true
+
     var body: some View {
         ZStack {
             switch content {
@@ -60,9 +63,8 @@ struct SplitPaneView: View {
                         surfaceView: surfaceView
                     )
 
-                    // 셸 초기화 완료 전까지 오버레이 표시
-                    // currentDirectory가 설정되면 셸이 준비된 것으로 판단 (OSC 7 수신)
-                    if surfaceView.currentDirectory == nil {
+                    // 셸 초기화 완료 전까지 오버레이
+                    if showInitOverlay {
                         Color.black
                             .overlay {
                                 VStack(spacing: 8) {
@@ -74,6 +76,17 @@ struct SplitPaneView: View {
                                 }
                             }
                             .transition(.opacity)
+                            .task {
+                                // 셸 준비 대기: currentDirectory가 설정될 때까지 폴링
+                                // 또는 최대 2초 후 강제 제거
+                                for _ in 0..<40 {  // 50ms x 40 = 2초
+                                    try? await Task.sleep(nanoseconds: 50_000_000)
+                                    if surfaceView.currentDirectory != nil { break }
+                                }
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    showInitOverlay = false
+                                }
+                            }
                     }
                 } else {
                     Color.black
