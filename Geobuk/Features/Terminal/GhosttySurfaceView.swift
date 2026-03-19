@@ -413,6 +413,29 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         }
     }
 
+    /// macOS 하드웨어 키코드로 키를 press+release 전송
+    /// - keyCode: macOS 키코드 (36=Enter, 48=Tab 등)
+    /// - char: 해당 키의 문자 (unshifted codepoint용)
+    func sendKeyPress(keyCode: UInt32, char: String = "", mods: ghostty_input_mods_e = GHOSTTY_MODS_NONE) {
+        guard let surface else { return }
+
+        let codepoint = char.unicodeScalars.first?.value ?? 0
+
+        // Press
+        var event = ghostty_input_key_s()
+        event.action = GHOSTTY_ACTION_PRESS
+        event.mods = mods
+        event.keycode = keyCode
+        event.text = nil
+        event.unshifted_codepoint = codepoint
+        event.composing = false
+        _ = ghostty_surface_key(surface, event)
+
+        // Release
+        event.action = GHOSTTY_ACTION_RELEASE
+        _ = ghostty_surface_key(surface, event)
+    }
+
     // MARK: - Binding Actions
 
     /// Ghostty 내장 액션 실행 (예: "increase_font_size:1", "reset_font_size")

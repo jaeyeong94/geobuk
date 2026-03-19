@@ -95,13 +95,18 @@ struct SplitPaneView: View {
                         BlockInputBar(
                             currentDirectory: surfaceView.currentDirectory,
                             onSubmit: { command in
-                                surfaceView.sendText(command + "\r")
+                                // 명령어 텍스트 전송 후 Enter 키 이벤트 전송
+                                surfaceView.sendText(command)
+                                // macOS Enter keycode = 36
+                                surfaceView.sendKeyPress(keyCode: 36, char: "\r")
                             },
                             onTab: {
-                                surfaceView.sendText("\t")
+                                // macOS Tab keycode = 48
+                                surfaceView.sendKeyPress(keyCode: 48, char: "\t")
                             },
                             onInterrupt: {
-                                surfaceView.sendText("\u{03}") // Ctrl+C
+                                // Ctrl+C: keycode 8 (c) + ctrl mod
+                                surfaceView.sendKeyPress(keyCode: 8, char: "c", mods: GHOSTTY_MODS_CTRL)
                             }
                         )
                     }
