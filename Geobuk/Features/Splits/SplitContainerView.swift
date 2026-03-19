@@ -57,6 +57,9 @@ struct SplitPaneView: View {
     /// 명령 실행 중 (TUI 모드 — 터미널 직접 입력)
     @State private var isCommandRunning = false
 
+    /// 입력창 포커스 트리거 (토글할 때마다 포커스)
+    @State private var inputFocusTrigger = false
+
     var body: some View {
         ZStack {
             switch content {
@@ -69,6 +72,16 @@ struct SplitPaneView: View {
                             )
                             .onAppear {
                                 if !isCommandRunning { surfaceView.blockInputMode = true }
+                            }
+
+                            // 블록 모드: 셸 영역 클릭 시 입력창에 포커스
+                            if !isCommandRunning {
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        onTap()
+                                        inputFocusTrigger.toggle()
+                                    }
                             }
 
                             // 셸 초기화 완료 전까지 오버레이
@@ -100,6 +113,7 @@ struct SplitPaneView: View {
 
                         BlockInputBar(
                             paneFocused: isFocused,
+                            focusTrigger: inputFocusTrigger,
                             currentDirectory: surfaceView.currentDirectory,
                             onSubmit: { command in
                                 surfaceView.sendText(command)
@@ -136,6 +150,8 @@ struct SplitPaneView: View {
                                     // 블록 입력 모드 복귀
                                     isCommandRunning = false
                                     surfaceView.blockInputMode = true
+                                    // 입력창에 포커스 복귀
+                                    inputFocusTrigger.toggle()
                                 }
                             },
                             onTab: {

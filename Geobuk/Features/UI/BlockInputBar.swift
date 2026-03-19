@@ -10,6 +10,9 @@ struct BlockInputBar: View {
     /// 패널이 포커스되어 있는지 (외부에서 전달)
     var paneFocused: Bool = false
 
+    /// 포커스 트리거 (토글할 때마다 포커스 설정)
+    var focusTrigger: Bool = false
+
     /// 셸의 현재 작업 디렉토리
     let currentDirectory: String?
 
@@ -31,12 +34,10 @@ struct BlockInputBar: View {
             inputLine
         }
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
-        .task(id: paneFocused) {
-            if paneFocused {
-                // 약간의 지연 후 포커스 (뷰 계층 안정화 대기)
-                try? await Task.sleep(nanoseconds: 100_000_000)
-                isInputFocused = true
-            }
+        .task(id: "\(paneFocused)-\(focusTrigger)") {
+            // 약간의 지연 후 포커스 (뷰 계층 안정화 대기)
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            isInputFocused = true
         }
     }
 
