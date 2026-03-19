@@ -270,51 +270,63 @@ struct SidebarView: View {
                 || ws.cwd == session.cwd
         }
 
-        HStack(spacing: 4) {
-            Circle()
-                .fill(sessionStatusColor(for: session))
-                .frame(width: 6, height: 6)
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text("PID \(session.pid)")
-                        .font(.system(size: 10, weight: .medium))
-                    if let ws = matchingWorkspace {
-                        Text(ws.name)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.accentColor)
-                    }
+        VStack(alignment: .leading, spacing: 3) {
+            // 라인 1: 상태 인디케이터 + 모델 이름
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(sessionStatusColor(for: session))
+                    .frame(width: 7, height: 7)
+                Text(claudeMonitor?.sessionModels[session.sessionId] ?? "claude")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+            }
+
+            // 라인 2: Phase + 현재 도구
+            if let monitor = claudeMonitor,
+               let state = monitor.getState(for: session.sessionId) {
+                Text(phaseText(state.phase, toolName: state.currentToolName))
+                    .font(.system(size: 9))
+                    .foregroundColor(state.phase == .waitingForInput ? .yellow : .secondary)
+            }
+
+            // 라인 3: 턴 시간 + 토큰 + 비용
+            HStack(spacing: 6) {
+                if let durationMs = claudeMonitor?.sessionTurnDurations[session.sessionId] {
+                    Text(formatDuration(durationMs))
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                if let state = claudeMonitor?.getState(for: session.sessionId),
+                   state.tokenUsage.totalTokens > 0 {
+                    Text(formatTokenCount(state.tokenUsage.totalTokens))
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                if let state = claudeMonitor?.getState(for: session.sessionId),
+                   state.costUSD > 0 {
+                    Text(String(format: "$%.2f", state.costUSD))
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundColor(.orange)
+                }
+            }
+
+            // 라인 4: Git 브랜치 + 경로
+            HStack(spacing: 4) {
+                if let branch = claudeMonitor?.sessionBranches[session.sessionId] {
+                    Text(branch)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.green)
                 }
                 Text(abbreviatedPath(session.cwd))
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-
-                // 세션별 독립 상태 표시
-                if let monitor = claudeMonitor,
-                   let sessionState = monitor.getState(for: session.sessionId),
-                   sessionState.phase != .idle {
-                    HStack(spacing: 4) {
-                        Text(phaseText(sessionState.phase, toolName: sessionState.currentToolName))
-                            .font(.system(size: 9))
-                            .foregroundColor(.secondary)
-                        if sessionState.tokenUsage.totalTokens > 0 {
-                            Text(formatTokenCount(sessionState.tokenUsage.totalTokens))
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(.secondary)
-                        }
-                        if sessionState.costUSD > 0 {
-                            Text(String(format: "$%.2f", sessionState.costUSD))
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(.orange)
-                        }
-                    }
-                }
             }
-            Spacer()
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 3)
+        .padding(.vertical, 5)
         .contentShape(Rectangle())
         .onTapGesture {
             // 해당 워크스페이스로 전환 + 포커싱
@@ -357,11 +369,22 @@ struct SidebarView: View {
     /// 토큰 수를 읽기 쉽게 포맷한다 (예: 12500 -> 12.5k)
     private func formatTokenCount(_ count: Int) -> String {
         if count >= 1_000_000 {
-            return String(format: "%.1fM tokens", Double(count) / 1_000_000.0)
+            return String(format: "%.1fM", Double(count) / 1_000_000.0)
         } else if count >= 1_000 {
-            return String(format: "%.1fk tokens", Double(count) / 1_000.0)
+            return String(format: "%.1fk", Double(count) / 1_000.0)
         }
-        return "\(count) tokens"
+        return "\(count)"
+    }
+
+    /// 밀리초를 읽기 쉽게 포맷 (12345 → "12.3s", 65432 → "1m 5s")
+    private func formatDuration(_ ms: Int) -> String {
+        let seconds = Double(ms) / 1000.0
+        if seconds < 60 {
+            return String(format: "%.1fs", seconds)
+        }
+        let minutes = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return "\(minutes)m \(secs)s"
     }
 
     private func abbreviatedPath(_ path: String) -> String {

@@ -15,6 +15,12 @@ final class ClaudeSessionMonitor {
     /// 세션별 모델 이름
     private(set) var sessionModels: [String: String] = [:]
 
+    /// 세션별 마지막 턴 소요 시간 (ms)
+    private(set) var sessionTurnDurations: [String: Int] = [:]
+
+    /// 세션별 Git 브랜치
+    private(set) var sessionBranches: [String: String] = [:]
+
     /// 가격 매니저
     var pricingManager: ClaudePricingManager?
 
@@ -147,6 +153,11 @@ final class ClaudeSessionMonitor {
             state.processEvent(.sessionInit(sessionId: sid))
         }
 
+        // Git 브랜치 추출 (모든 이벤트에 포함)
+        if let branch = event["gitBranch"] as? String, !branch.isEmpty {
+            sessionBranches[sid] = branch
+        }
+
         // 단일 상태도 마지막 활성 세션으로 업데이트 (하위 호환)
         let _ = { self.sessionState.processEvent(.sessionInit(sessionId: sid)) }()
 
@@ -234,6 +245,10 @@ final class ClaudeSessionMonitor {
             if let subtype = event["subtype"] as? String {
                 switch subtype {
                 case "turn_duration":
+                    // 턴 소요 시간 기록
+                    if let durationMs = event["durationMs"] as? Int {
+                        sessionTurnDurations[sid] = durationMs
+                    }
                     // 턴 완료 → 입력 대기 상태
                     state.processEvent(.permissionRequest(toolName: ""))
                 case "stop_hook_summary":
@@ -258,5 +273,7 @@ final class ClaudeSessionMonitor {
     func removeSession(_ sessionId: String) {
         sessionStates.removeValue(forKey: sessionId)
         sessionModels.removeValue(forKey: sessionId)
+        sessionTurnDurations.removeValue(forKey: sessionId)
+        sessionBranches.removeValue(forKey: sessionId)
     }
 }
