@@ -31,16 +31,16 @@ struct ContentView: View {
                 await initializeTerminal()
             }
             .modifier(PaneNotificationModifier(
-                onSplitHorizontally: { splitFocusedPane(direction: .horizontal) },
-                onSplitVertically: { splitFocusedPane(direction: .vertical) },
-                onToggleMaximize: { activeManager?.toggleMaximize() },
+                onSplitHorizontally: { withAnimation(.easeInOut(duration: 0.15)) { splitFocusedPane(direction: .horizontal) } },
+                onSplitVertically: { withAnimation(.easeInOut(duration: 0.15)) { splitFocusedPane(direction: .vertical) } },
+                onToggleMaximize: { withAnimation(.easeInOut(duration: 0.15)) { activeManager?.toggleMaximize() } },
                 onFocusDirection: { notification in
                     if let direction = notification.object as? NavigationDirection {
                         activeManager?.focusPane(direction: direction)
                         if let id = activeManager?.focusedPaneId { focusSurfaceView(id: id) }
                     }
                 },
-                onClosePane: { closeFocusedPane() },
+                onClosePane: { withAnimation(.easeInOut(duration: 0.15)) { closeFocusedPane() } },
                 onChildExited: { notification in
                     if let surfaceView = notification.object as? GhosttySurfaceView {
                         closePane(for: surfaceView)
@@ -157,6 +157,7 @@ struct ContentView: View {
                     onTap: {},
                     surfaceViewProvider: { id in surfaceViews[id] }
                 )
+                .transition(.opacity)
             } else {
                 SplitContainerView(
                     node: splitManager.root,
@@ -169,6 +170,7 @@ struct ContentView: View {
                         surfaceViews[id]
                     }
                 )
+                .transition(.opacity)
             }
         } else {
             Color.black
