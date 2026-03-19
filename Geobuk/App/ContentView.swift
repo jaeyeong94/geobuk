@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var processMonitor = PaneProcessMonitor()
     @State private var claudeLaunchSettings = ClaudeLaunchSettings()
     @State private var pricingManager = ClaudePricingManager()
+    @State private var shellStateManager = ShellStateManager()
 
     var body: some View {
         Group {
@@ -31,6 +32,7 @@ struct ContentView: View {
                             claudeMonitor: claudeMonitor,
                             claudeFileWatcher: claudeFileWatcher,
                             processMonitor: processMonitor,
+                            shellStateManager: shellStateManager,
                             surfaceViews: surfaceViews,
                             onWorkspaceSwitch: { ensureSurfaceForActiveWorkspace() },
                             onCreateWorkspace: { createNewWorkspace() },
@@ -405,7 +407,7 @@ struct ContentView: View {
 
     @MainActor
     private func startSocketServer() async {
-        let server = SocketServer(sessionManager: sessionManager)
+        let server = SocketServer(sessionManager: sessionManager, shellStateManager: shellStateManager)
         self.socketServer = server
         do {
             try await server.start()

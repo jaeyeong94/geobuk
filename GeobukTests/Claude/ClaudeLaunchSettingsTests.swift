@@ -3,6 +3,7 @@ import Foundation
 @testable import Geobuk
 
 @Suite("ClaudeLaunchSettings")
+@MainActor
 struct ClaudeLaunchSettingsTests {
 
     // MARK: - 단위 테스트 (Unit Tests)
@@ -186,7 +187,11 @@ struct ClaudeLaunchSettingsTests {
 
     @Test("availableModels_올바른목록반환")
     func availableModels_returnsCorrectList() {
-        #expect(ClaudeLaunchSettings.availableModels == ["sonnet", "opus", "haiku"])
+        let settings = ClaudeLaunchSettings()
+        let modelIds = settings.availableModels.map(\.id)
+        #expect(modelIds.contains("sonnet"))
+        #expect(modelIds.contains("opus"))
+        #expect(modelIds.contains("haiku"))
     }
 
     @Test("availableEfforts_올바른목록반환")
@@ -216,7 +221,7 @@ struct ClaudeLaunchSettingsTests {
     @Test("buildCommand_모든모델조합_크래시없음")
     func buildCommand_allModelCombinations_noCrash() {
         let settings = ClaudeLaunchSettings()
-        let models = ClaudeLaunchSettings.availableModels
+        let models = settings.availableModels.map(\.id)
         let efforts = ClaudeLaunchSettings.availableEfforts
         let permissions = ClaudeLaunchSettings.availablePermissionModes
 
@@ -243,7 +248,7 @@ struct ClaudeLaunchSettingsTests {
             settings.verbose = Bool.random()
             settings.continueSession = Bool.random()
             settings.worktree = Bool.random()
-            settings.model = ClaudeLaunchSettings.availableModels.randomElement()!
+            settings.model = settings.availableModels.randomElement()!.id
             settings.effort = ClaudeLaunchSettings.availableEfforts.randomElement()!
             settings.permissionMode = ClaudeLaunchSettings.availablePermissionModes.randomElement()!
             let command = settings.buildCommand()

@@ -48,15 +48,57 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         surfaceConfig.font_size = 0 // 0 = config default
         surfaceConfig.context = GHOSTTY_SURFACE_CONTEXT_WINDOW
 
-        // 작업 디렉토리 설정
-        if let cwd {
-            cwd.withCString { ptr in
-                surfaceConfig.working_directory = ptr
+        // 환경 변수 준비: 셸 통합 스크립트가 사용할 surface ID와 소켓 경로
+        let envVarDefs: [(String, String)] = [
+            ("GEOBUK_SURFACE_ID", viewId.uuidString),
+            ("GEOBUK_SOCKET_PATH", SocketServer.defaultSocketPath),
+        ]
+
+        // C 문자열 포인터를 ghostty_surface_new 호출 전까지 유지해야 함
+        // withCString 중첩 대신, 명시적으로 strdup하여 수명을 관리
+        var cKeys: [UnsafeMutablePointer<CChar>] = []
+        var cValues: [UnsafeMutablePointer<CChar>] = []
+        var envVars: [ghostty_env_var_s] = []
+
+        for (key, value) in envVarDefs {
+            let cKey = strdup(key)!
+            let cValue = strdup(value)!
+            cKeys.append(cKey)
+            cValues.append(cValue)
+            envVars.append(ghostty_env_var_s(key: cKey, value: cValue))
+        }
+
+        // 셸 통합 스크립트 경로도 환경 변수로 설정
+        if let integrationPath = Bundle.main.path(
+            forResource: "geobuk-zsh-integration",
+            ofType: "zsh",
+            inDirectory: "shell-integration"
+        ) {
+            let cKey = strdup("GEOBUK_SHELL_INTEGRATION")!
+            let cValue = strdup(integrationPath)!
+            cKeys.append(cKey)
+            cValues.append(cValue)
+            envVars.append(ghostty_env_var_s(key: cKey, value: cValue))
+        }
+
+        envVars.withUnsafeMutableBufferPointer { buffer in
+            surfaceConfig.env_vars = buffer.baseAddress
+            surfaceConfig.env_var_count = buffer.count
+
+            // 작업 디렉토리 설정
+            if let cwd {
+                cwd.withCString { ptr in
+                    surfaceConfig.working_directory = ptr
+                    self.surface = ghostty_surface_new(appHandle, &surfaceConfig)
+                }
+            } else {
                 self.surface = ghostty_surface_new(appHandle, &surfaceConfig)
             }
-        } else {
-            self.surface = ghostty_surface_new(appHandle, &surfaceConfig)
         }
+
+        // C 문자열 해제 (surface 생성 완료 후 안전)
+        for ptr in cKeys { free(ptr) }
+        for ptr in cValues { free(ptr) }
     }
 
     @available(*, unavailable)

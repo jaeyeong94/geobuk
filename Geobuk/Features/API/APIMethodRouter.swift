@@ -5,9 +5,11 @@ import Foundation
 @MainActor
 final class APIMethodRouter {
     private let sessionManager: SessionManager
+    private let shellStateManager: ShellStateManager?
 
-    init(sessionManager: SessionManager) {
+    init(sessionManager: SessionManager, shellStateManager: ShellStateManager? = nil) {
         self.sessionManager = sessionManager
+        self.shellStateManager = shellStateManager
     }
 
     /// 요청을 라우팅하여 응답 생성
@@ -27,6 +29,10 @@ final class APIMethodRouter {
             return handleSessionCaptureOutput(request)
         case "session.exists":
             return handleSessionExists(request)
+        case "shell.reportTty":
+            return handleShellReportTty(request)
+        case "shell.reportState":
+            return handleShellReportState(request)
         default:
             return .error(
                 code: JSONRPCErrorCode.methodNotFound.rawValue,
@@ -180,5 +186,54 @@ final class APIMethodRouter {
 
         let exists = sessionManager.sessionExists(name: name)
         return .success(result: .bool(exists), id: request.id)
+    }
+
+    // MARK: - Shell Integration 핸들러
+
+    private func handleShellReportTty(_ request: JSONRPCRequest) -> JSONRPCResponse {
+        guard let shellStateManager else {
+            return .error(
+                code: JSONRPCErrorCode.methodNotFound.rawValue,
+                message: "Shell state manager not available",
+                id: request.id
+            )
+        }
+
+        guard let params = request.params,
+              let surfaceId = params["surfaceId"]?.stringValue,
+              let tty = params["tty"]?.stringValue else {
+            return .error(
+                code: JSONRPCErrorCode.invalidParams.rawValue,
+                message: "Missing required parameters: surfaceId, tty",
+                id: request.id
+            )
+        }
+
+        shellStateManager.reportTty(surfaceId: surfaceId, tty: tty)
+        return .success(result: .null, id: request.id)
+    }
+
+    private func handleShellReportState(_ request: JSONRPCRequest) -> JSONRPCResponse {
+        guard let shellStateManager else {
+            return .error(
+                code: JSONRPCErrorCode.methodNotFound.rawValue,
+                message: "Shell state manager not available",
+                id: request.id
+            )
+        }
+
+        guard let params = request.params,
+              let surfaceId = params["surfaceId"]?.stringValue,
+              let state = params["state"]?.stringValue else {
+            return .error(
+                code: JSONRPCErrorCode.invalidParams.rawValue,
+                message: "Missing required parameters: surfaceId, state",
+                id: request.id
+            )
+        }
+
+        let command = params["command"]?.stringValue
+        shellStateManager.reportState(surfaceId: surfaceId, state: state, command: command)
+        return .success(result: .null, id: request.id)
     }
 }

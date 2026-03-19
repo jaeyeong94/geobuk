@@ -18,23 +18,28 @@ actor SocketServer {
     /// 세션 매니저 참조 (MainActor 격리)
     private let sessionManager: SessionManager
 
+    /// 셸 상태 매니저 참조 (MainActor 격리)
+    private let shellStateManager: ShellStateManager?
+
     /// accept 루프 태스크
     private var acceptTask: Task<Void, Never>?
 
     // MARK: - Init
 
     /// 소켓 경로와 세션 매니저를 지정하여 생성
-    init(socketPath: String, sessionManager: SessionManager) {
+    init(socketPath: String, sessionManager: SessionManager, shellStateManager: ShellStateManager? = nil) {
         self.socketPath = socketPath
         self.sessionManager = sessionManager
+        self.shellStateManager = shellStateManager
     }
 
     /// 세션 매니저만 지정하여 생성 (기본 소켓 경로 사용)
-    init(sessionManager: SessionManager) {
+    init(sessionManager: SessionManager, shellStateManager: ShellStateManager? = nil) {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let geobukDir = appSupport.appendingPathComponent("Geobuk")
         self.socketPath = geobukDir.appendingPathComponent("geobuk.sock").path
         self.sessionManager = sessionManager
+        self.shellStateManager = shellStateManager
     }
 
     /// 기본 소켓 경로를 반환하는 정적 헬퍼
@@ -212,7 +217,7 @@ actor SocketServer {
     private func processRequest(_ data: Data, sessionManager: SessionManager) async -> Data? {
         do {
             let request = try JSONDecoder().decode(JSONRPCRequest.self, from: data)
-            let router = await APIMethodRouter(sessionManager: sessionManager)
+            let router = await APIMethodRouter(sessionManager: sessionManager, shellStateManager: shellStateManager)
             let response = await router.route(request)
             return try JSONEncoder().encode(response)
         } catch {

@@ -6,6 +6,7 @@ struct SidebarView: View {
     var claudeMonitor: ClaudeSessionMonitor?
     var claudeFileWatcher: ClaudeSessionFileWatcher?
     var processMonitor: PaneProcessMonitor?
+    var shellStateManager: ShellStateManager?
     var surfaceViews: [UUID: GhosttySurfaceView] = [:]
     var onWorkspaceSwitch: (() -> Void)?
     var onCreateWorkspace: (() -> Void)?
@@ -145,8 +146,11 @@ struct SidebarView: View {
             let surfaceView = surfaceViews[pane.id]
             let currentDir = surfaceView?.currentDirectory
 
-            // 프로세스명: Claude이면 "claude", 아니면 nil (추후 PTY-PID 매핑으로 확장)
-            let processName: String? = isClaudeSession ? (claudeInfo?.processName ?? "claude") : nil
+            // 프로세스명: Claude이면 "claude", 셸 통합에서 running이면 command, 그 외 nil
+            let shellProcessName = surfaceView.map { shellStateManager?.displayProcessName(for: $0.viewId.uuidString) } ?? nil
+            let processName: String? = isClaudeSession
+                ? (claudeInfo?.processName ?? "claude")
+                : shellProcessName
 
             // Claude 상태
             let claudePhase: AISessionPhase? = isClaudeSession ? (claudeMonitor?.sessionState.phase ?? .sessionActive) : nil
