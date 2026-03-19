@@ -41,6 +41,16 @@ class SurfaceContainerView: NSView {
 
         addSubview(scrollView)
 
+        // 멀티 모니터: 윈도우가 다른 화면으로 이동할 때 display ID 업데이트
+        resizeObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.didChangeScreenNotification,
+                object: nil, queue: .main
+            ) { [weak self] _ in
+                self?.updateDisplayId()
+            }
+        )
+
         // 윈도우 라이브 리사이즈 시작/종료 감지
         resizeObservers.append(
             NotificationCenter.default.addObserver(
@@ -73,6 +83,20 @@ class SurfaceContainerView: NSView {
 
     deinit {
         resizeObservers.forEach { NotificationCenter.default.removeObserver($0) }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // 윈도우에 처음 추가될 때 display ID 설정
+        updateDisplayId()
+    }
+
+    /// 현재 화면의 display ID를 ghostty surface에 전달 (멀티 모니터 대응)
+    private func updateDisplayId() {
+        guard let screen = window?.screen,
+              let surface = surfaceView.surfaceHandle else { return }
+        let displayId = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
+        ghostty_surface_set_display_id(surface, displayId)
     }
 
     override var safeAreaInsets: NSEdgeInsets { NSEdgeInsetsZero }

@@ -40,8 +40,24 @@ _geobuk_send() {
     disown 2>/dev/null
 }
 
+# SIGWINCH 핸들러: 리사이즈 시 reflow 아티팩트 완화
+# Ghostty의 OSC 133 프롬프트 마크에 redraw=last를 추가하여
+# 리사이즈 시 마지막 프롬프트만 다시 그리도록 함
+_geobuk_precmd_prompt_mark() {
+    # OSC 133;A 프롬프트 마크에 redraw=last 힌트 추가
+    # 터미널 리사이즈 시 전체 reflow 대신 마지막 프롬프트만 재표시
+    printf '\e]133;A;redraw=last\a'
+}
+
+# SIGWINCH 핸들러: 리사이즈 시 출력 덮어쓰기 방지
+TRAPWINCH() {
+    # 기본 SIGWINCH 동작 억제하여 reflow 아티팩트 감소
+    :
+}
+
 # zsh 훅 등록
 precmd_functions+=(_geobuk_precmd)
+precmd_functions+=(_geobuk_precmd_prompt_mark)
 preexec_functions+=(_geobuk_preexec)
 
 # 최초 로드 시 TTY 보고

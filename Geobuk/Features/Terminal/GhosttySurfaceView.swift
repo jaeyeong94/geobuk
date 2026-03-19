@@ -32,7 +32,9 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     /// GhosttyApp으로부터 새 surface 생성
     init(app: GhosttyApp, cwd: String? = nil, command: String? = nil) {
         self.ghosttyApp = app
-        super.init(frame: .zero)
+        // 초기 프레임을 0이 아닌 크기로 설정하여 빈 화면 방지
+        // Metal 렌더링이 시작될 때 유효한 크기가 필요함
+        super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
 
         guard let appHandle = app.appHandle else { return }
 
@@ -110,6 +112,84 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         GeobukLogger.debug(.terminal, "Surface created", context: ["viewId": viewId.uuidString])
     }
 
+    /// 기존 surface의 설정을 상속받아 새 surface 생성 (분할 시 사용)
+    /// 폰트 크기, 색상 테마 등 현재 surface의 설정이 새 패널에 그대로 적용됨
+    init(app: GhosttyApp, inheritFrom existingSurface: GhosttySurfaceView) {
+        self.ghosttyApp = app
+        super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+
+        guard let appHandle = app.appHandle,
+              let sourceSurface = existingSurface.surfaceHandle else { return }
+
+        // 기존 surface에서 설정 상속
+        var surfaceConfig = ghostty_surface_inherited_config(sourceSurface, GHOSTTY_SURFACE_CONTEXT_SPLIT)
+        surfaceConfig.platform_tag = GHOSTTY_PLATFORM_MACOS
+        surfaceConfig.platform = ghostty_platform_u(
+            macos: ghostty_platform_macos_s(
+                nsview: Unmanaged.passUnretained(self).toOpaque()
+            )
+        )
+        surfaceConfig.userdata = Unmanaged.passUnretained(self).toOpaque()
+        surfaceConfig.scale_factor = Double(NSScreen.main?.backingScaleFactor ?? 2.0)
+
+        // 환경 변수 준비
+        let envVarDefs: [(String, String)] = [
+            ("GEOBUK_SURFACE_ID", viewId.uuidString),
+            ("GEOBUK_SOCKET_PATH", SocketServer.defaultSocketPath),
+        ]
+
+        var cKeys: [UnsafeMutablePointer<CChar>] = []
+        var cValues: [UnsafeMutablePointer<CChar>] = []
+        var envVars: [ghostty_env_var_s] = []
+
+        for (key, value) in envVarDefs {
+            let cKey = strdup(key)!
+            let cValue = strdup(value)!
+            cKeys.append(cKey)
+            cValues.append(cValue)
+            envVars.append(ghostty_env_var_s(key: cKey, value: cValue))
+        }
+
+        if let integrationPath = Bundle.main.path(
+            forResource: "geobuk-zsh-integration",
+            ofType: "zsh",
+            inDirectory: "shell-integration"
+        ) {
+            let cKey = strdup("GEOBUK_SHELL_INTEGRATION")!
+            let cValue = strdup(integrationPath)!
+            cKeys.append(cKey)
+            cValues.append(cValue)
+            envVars.append(ghostty_env_var_s(key: cKey, value: cValue))
+        }
+
+        let sourceCmd = "[[ -n \"$GEOBUK_SHELL_INTEGRATION\" ]] && source \"$GEOBUK_SHELL_INTEGRATION\" 2>/dev/null; clear\r"
+        let cSourceCmd = strdup(sourceCmd)!
+        cKeys.append(cSourceCmd)
+        surfaceConfig.initial_input = UnsafePointer(cSourceCmd)
+
+        // 기존 surface의 작업 디렉토리 상속
+        let inheritedCwd = existingSurface.currentDirectory
+
+        envVars.withUnsafeMutableBufferPointer { buffer in
+            surfaceConfig.env_vars = buffer.baseAddress
+            surfaceConfig.env_var_count = buffer.count
+
+            if let cwd = inheritedCwd {
+                cwd.withCString { ptr in
+                    surfaceConfig.working_directory = ptr
+                    self.surface = ghostty_surface_new(appHandle, &surfaceConfig)
+                }
+            } else {
+                self.surface = ghostty_surface_new(appHandle, &surfaceConfig)
+            }
+        }
+
+        for ptr in cKeys { free(ptr) }
+        for ptr in cValues { free(ptr) }
+
+        GeobukLogger.debug(.terminal, "Surface created (inherited config)", context: ["viewId": viewId.uuidString])
+    }
+
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) is not supported")
@@ -140,6 +220,15 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         guard let window else { return }
         layer?.contentsScale = window.backingScaleFactor
         updateContentScale()
+    }
+
+    // MARK: - Terminal Size
+
+    /// 현재 터미널 크기 (columns/rows) 조회
+    var terminalSize: (columns: UInt16, rows: UInt16)? {
+        guard let surface else { return nil }
+        let size = ghostty_surface_size(surface)
+        return (size.columns, size.rows)
     }
 
     // MARK: - Size & Scale
@@ -332,6 +421,20 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         action.withCString { ptr in
             _ = ghostty_surface_binding_action(surface, ptr, UInt(action.utf8.count))
         }
+    }
+
+    // MARK: - Text Reading (스크롤백 복원 인프라)
+
+    /// 선택 영역의 텍스트를 읽는다 (향후 스크롤백 저장/복원에 사용)
+    /// 현재는 ghostty_surface_read_selection을 통해 선택된 텍스트만 읽을 수 있음
+    /// 전체 스크롤백 버퍼 읽기는 ghostty API 확장이 필요하여 향후 구현 예정
+    func readSelectedText() -> String? {
+        guard let surface else { return nil }
+        var text = ghostty_text_s()
+        guard ghostty_surface_read_selection(surface, &text) else { return nil }
+        defer { ghostty_surface_free_text(surface, &text) }
+        guard let data = text.text else { return nil }
+        return String(cString: data)
     }
 
     // MARK: - Cleanup

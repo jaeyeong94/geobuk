@@ -87,6 +87,34 @@ final class GhosttyApp {
                 // false 반환: Ghostty 내부에서도 PWD를 처리하도록 허용 (타이틀 바 등)
                 return false
             }
+
+            // 자식 프로세스 종료 시 패널 자동 닫기
+            if action.tag == GHOSTTY_ACTION_SHOW_CHILD_EXITED {
+                if target.tag == GHOSTTY_TARGET_SURFACE {
+                    let surface = target.target.surface
+                    if let userdata = ghostty_surface_userdata(surface) {
+                        let exitCode = action.action.child_exited.exit_code
+                        DispatchQueue.main.async {
+                            // surface가 이미 해제되었으면 건너뜀
+                            guard ghostty_surface_userdata(surface) != nil else { return }
+                            let surfaceView = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
+                            guard surfaceView.hasSurface else { return }
+                            GeobukLogger.info(.terminal, "Child process exited", context: [
+                                "viewId": surfaceView.viewId.uuidString,
+                                "exitCode": "\(exitCode)",
+                            ])
+                            NotificationCenter.default.post(
+                                name: .ghosttySurfaceChildExited,
+                                object: surfaceView,
+                                userInfo: ["exitCode": exitCode]
+                            )
+                        }
+                    }
+                }
+                // true 반환: "Press any key" 메시지 억제
+                return true
+            }
+
             return false
         }
         runtimeConfig.read_clipboard_cb = { userdata, location, state in
@@ -236,4 +264,6 @@ enum GhosttyError: Error {
 
 extension Notification.Name {
     static let ghosttySurfaceClosed = Notification.Name("ghosttySurfaceClosed")
+    /// 자식 프로세스 종료 시 발생 (userInfo: ["exitCode": UInt32])
+    static let ghosttySurfaceChildExited = Notification.Name("ghosttySurfaceChildExited")
 }

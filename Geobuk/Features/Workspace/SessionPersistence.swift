@@ -13,6 +13,16 @@ struct PersistedSplitNode: Codable {
     let direction: String?   // "horizontal" or "vertical"
     let ratio: Double?
     let children: [PersistedSplitNode]?
+    /// 스크롤백 텍스트 (향후 복원용, 현재 미사용)
+    let scrollbackText: String?
+
+    init(type: NodeType, direction: String?, ratio: Double?, children: [PersistedSplitNode]?, scrollbackText: String? = nil) {
+        self.type = type
+        self.direction = direction
+        self.ratio = ratio
+        self.children = children
+        self.scrollbackText = scrollbackText
+    }
 }
 
 /// 영속화된 워크스페이스

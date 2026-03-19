@@ -23,6 +23,80 @@ struct ContentView: View {
     @State private var shellStateManager = ShellStateManager()
 
     var body: some View {
+        mainContent
+            .frame(minWidth: 600, minHeight: 400)
+            .background(Color.black)
+            .task {
+                await initializeTerminal()
+            }
+            .modifier(PaneNotificationModifier(
+                onSplitHorizontally: { splitFocusedPane(direction: .horizontal) },
+                onSplitVertically: { splitFocusedPane(direction: .vertical) },
+                onToggleMaximize: { activeManager?.toggleMaximize() },
+                onFocusDirection: { notification in
+                    if let direction = notification.object as? NavigationDirection {
+                        activeManager?.focusPane(direction: direction)
+                        if let id = activeManager?.focusedPaneId { focusSurfaceView(id: id) }
+                    }
+                },
+                onClosePane: { closeFocusedPane() },
+                onChildExited: { notification in
+                    if let surfaceView = notification.object as? GhosttySurfaceView {
+                        closePane(for: surfaceView)
+                    }
+                }
+            ))
+            .modifier(WorkspaceNotificationModifier(
+                onNewWorkspace: { createNewWorkspace() },
+                onCloseWorkspace: { closeActiveWorkspace() },
+                onToggleSidebar: { isSidebarVisible.toggle() },
+                onSwitchWorkspace: { notification in
+                    if let number = notification.object as? Int {
+                        workspaceManager.switchToWorkspace(at: number - 1)
+                        ensureSurfaceForActiveWorkspace()
+                    }
+                },
+                onNewClaudeSession: { startNewClaudeSession() },
+                onOpenSettings: { isSettingsOpen.toggle() }
+            ))
+            .popover(isPresented: $isSettingsOpen, arrowEdge: .trailing) {
+                TerminalSettingsView(
+                    fontSize: $fontSize,
+                    paddingX: $paddingX,
+                    paddingY: $paddingY,
+                    lineHeight: $lineHeight,
+                    claudeSettings: claudeLaunchSettings,
+                    onFontSizeChange: { newSize in
+                        setFontSizeForAllSurfaces(newSize)
+                    },
+                    onConfigChanged: {
+                        ghosttyApp.updateSettings(
+                            fontSize: fontSize,
+                            paddingX: paddingX,
+                            paddingY: paddingY,
+                            lineHeight: lineHeight
+                        )
+                    }
+                )
+            }
+            .onDisappear {
+                autoSaveTimer?.invalidate()
+                processMonitor.stopMonitoring()
+                claudeMonitor.stopAll()
+                claudeFileWatcher.stopWatching()
+                SessionPersistence.save(manager: workspaceManager)
+                Task { await socketServer?.stop() }
+                sessionManager.destroyAllSessions()
+                for surfaceView in surfaceViews.values {
+                    surfaceView.close()
+                }
+                surfaceViews.removeAll()
+                ghosttyApp.destroy()
+            }
+    }
+
+    @ViewBuilder
+    private var mainContent: some View {
         Group {
             if isInitialized {
                 HStack(spacing: 0) {
@@ -57,84 +131,6 @@ struct ContentView: View {
                 ProgressView("Initializing terminal...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }
-        .frame(minWidth: 600, minHeight: 400)
-        .background(Color.black)
-        .task {
-            await initializeTerminal()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .splitHorizontally)) { _ in
-            splitFocusedPane(direction: .horizontal)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .splitVertically)) { _ in
-            splitFocusedPane(direction: .vertical)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleMaximize)) { _ in
-            activeManager?.toggleMaximize()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .focusPaneDirection)) { notification in
-            if let direction = notification.object as? NavigationDirection {
-                activeManager?.focusPane(direction: direction)
-                if let id = activeManager?.focusedPaneId { focusSurfaceView(id: id) }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .closePane)) { _ in
-            closeFocusedPane()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .newWorkspace)) { _ in
-            createNewWorkspace()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .closeWorkspace)) { _ in
-            closeActiveWorkspace()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleSidebar)) { _ in
-            isSidebarVisible.toggle()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .switchWorkspaceByNumber)) { notification in
-            if let number = notification.object as? Int {
-                workspaceManager.switchToWorkspace(at: number - 1)
-                ensureSurfaceForActiveWorkspace()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .newClaudeSession)) { _ in
-            startNewClaudeSession()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
-            isSettingsOpen.toggle()
-        }
-        .popover(isPresented: $isSettingsOpen, arrowEdge: .trailing) {
-            TerminalSettingsView(
-                fontSize: $fontSize,
-                paddingX: $paddingX,
-                paddingY: $paddingY,
-                lineHeight: $lineHeight,
-                claudeSettings: claudeLaunchSettings,
-                onFontSizeChange: { newSize in
-                    setFontSizeForAllSurfaces(newSize)
-                },
-                onConfigChanged: {
-                    ghosttyApp.updateSettings(
-                        fontSize: fontSize,
-                        paddingX: paddingX,
-                        paddingY: paddingY,
-                        lineHeight: lineHeight
-                    )
-                }
-            )
-        }
-        .onDisappear {
-            autoSaveTimer?.invalidate()
-            processMonitor.stopMonitoring()
-            claudeMonitor.stopAll()
-            claudeFileWatcher.stopWatching()
-            SessionPersistence.save(manager: workspaceManager)
-            Task { await socketServer?.stop() }
-            sessionManager.destroyAllSessions()
-            for surfaceView in surfaceViews.values {
-                surfaceView.close()
-            }
-            surfaceViews.removeAll()
-            ghosttyApp.destroy()
         }
     }
 
@@ -274,11 +270,23 @@ struct ContentView: View {
     private func splitFocusedPane(direction: SplitDirection) {
         guard isInitialized, let splitManager = activeManager else { return }
 
+        // 분할 전 현재 포커스된 패널의 surfaceView를 캡처 (설정 상속용)
+        let existingSurfaceView: GhosttySurfaceView? = {
+            guard let focusedId = splitManager.focusedPaneId else { return nil }
+            return surfaceViews[focusedId]
+        }()
+
         splitManager.splitFocusedPane(direction: direction)
 
         if let newPaneId = splitManager.focusedPaneId,
            surfaceViews[newPaneId] == nil {
-            let surfaceView = GhosttySurfaceView(app: ghosttyApp)
+            // 기존 surface가 있으면 설정 상속, 없으면 기본 생성
+            let surfaceView: GhosttySurfaceView
+            if let existing = existingSurfaceView {
+                surfaceView = GhosttySurfaceView(app: ghosttyApp, inheritFrom: existing)
+            } else {
+                surfaceView = GhosttySurfaceView(app: ghosttyApp)
+            }
             surfaceViews[newPaneId] = surfaceView
             GeobukLogger.info(.workspace, "Pane split", context: ["direction": "\(direction)", "paneId": newPaneId.uuidString])
 
@@ -320,6 +328,46 @@ struct ContentView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     focusSurfaceView(id: newFocusId)
                 }
+            }
+        }
+    }
+
+    // MARK: - Auto-close Pane (child exited)
+
+    /// surfaceView에 해당하는 패널을 자동으로 닫는다 (자식 프로세스 종료 시)
+    @MainActor
+    private func closePane(for surfaceView: GhosttySurfaceView) {
+        // surfaceView의 viewId가 아닌, surfaceViews 딕셔너리의 key(paneId)를 찾아야 함
+        guard let paneId = surfaceViews.first(where: { $0.value === surfaceView })?.key else { return }
+        guard let splitManager = activeManager else { return }
+
+        // 패널이 1개이고 워크스페이스도 1개면 앱 종료
+        if splitManager.paneCount <= 1 && workspaceManager.workspaces.count <= 1 {
+            SessionPersistence.save(manager: workspaceManager)
+            NSApplication.shared.terminate(nil)
+            return
+        }
+
+        // 패널이 1개이고 워크스페이스가 여러 개면 워크스페이스 닫기
+        if splitManager.paneCount <= 1 && workspaceManager.workspaces.count > 1 {
+            closeActiveWorkspace()
+            return
+        }
+
+        GeobukLogger.info(.workspace, "Pane auto-closing (child exited)", context: ["paneId": paneId.uuidString])
+
+        // 해당 패널에 포커스를 맞추고 닫기
+        splitManager.setFocusedPane(id: paneId)
+        splitManager.closeFocusedPane()
+
+        if let removed = surfaceViews.removeValue(forKey: paneId) {
+            claudeMonitor.stopMonitoring(surfaceViewId: removed.viewId)
+            removed.close()
+        }
+
+        if let newFocusId = splitManager.focusedPaneId {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusSurfaceView(id: newFocusId)
             }
         }
     }
@@ -455,6 +503,72 @@ struct ContentView: View {
                 surfaceView.executeAction("decrease_font_size:\(abs(diff))")
             }
         }
+    }
+}
+
+// MARK: - Notification ViewModifiers (타입 체커 부하 분산)
+
+/// 패널 관련 알림을 처리하는 ViewModifier
+private struct PaneNotificationModifier: ViewModifier {
+    let onSplitHorizontally: () -> Void
+    let onSplitVertically: () -> Void
+    let onToggleMaximize: () -> Void
+    let onFocusDirection: (Notification) -> Void
+    let onClosePane: () -> Void
+    let onChildExited: (Notification) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .splitHorizontally)) { _ in
+                onSplitHorizontally()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .splitVertically)) { _ in
+                onSplitVertically()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleMaximize)) { _ in
+                onToggleMaximize()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .focusPaneDirection)) { notification in
+                onFocusDirection(notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .closePane)) { _ in
+                onClosePane()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .ghosttySurfaceChildExited)) { notification in
+                onChildExited(notification)
+            }
+    }
+}
+
+/// 워크스페이스 관련 알림을 처리하는 ViewModifier
+private struct WorkspaceNotificationModifier: ViewModifier {
+    let onNewWorkspace: () -> Void
+    let onCloseWorkspace: () -> Void
+    let onToggleSidebar: () -> Void
+    let onSwitchWorkspace: (Notification) -> Void
+    let onNewClaudeSession: () -> Void
+    let onOpenSettings: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .newWorkspace)) { _ in
+                onNewWorkspace()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .closeWorkspace)) { _ in
+                onCloseWorkspace()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleSidebar)) { _ in
+                onToggleSidebar()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .switchWorkspaceByNumber)) { notification in
+                onSwitchWorkspace(notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .newClaudeSession)) { _ in
+                onNewClaudeSession()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
+                onOpenSettings()
+            }
     }
 }
 
