@@ -35,6 +35,15 @@ final class ShellStateManager {
             updatedAt: Date()
         )
         GeobukLogger.debug(.shell, "Shell state changed", context: ["surfaceId": surfaceId, "state": state, "command": command ?? ""])
+
+        // 프롬프트 상태로 전환 시 알림 발송 (명령 완료 감지용)
+        if state == "prompt" {
+            NotificationCenter.default.post(
+                name: .geobukShellPromptReady,
+                object: nil,
+                userInfo: ["surfaceId": surfaceId]
+            )
+        }
     }
 
     /// Surface 제거 시 관련 데이터를 정리한다
@@ -44,6 +53,16 @@ final class ShellStateManager {
         GeobukLogger.debug(.shell, "Surface removed", context: ["surfaceId": surfaceId])
     }
 
+}
+
+// MARK: - Notifications
+
+extension Notification.Name {
+    /// 셸이 프롬프트 상태로 전환될 때 발생 (userInfo: ["surfaceId": String])
+    static let geobukShellPromptReady = Notification.Name("geobukShellPromptReady")
+}
+
+extension ShellStateManager {
     /// 사이드바 표시용 프로세스 이름을 반환한다
     /// running 상태이면 실행 중인 command를, prompt 상태이면 nil을 반환한다
     func displayProcessName(for surfaceId: String) -> String? {

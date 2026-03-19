@@ -143,14 +143,14 @@ struct PaneRowView: View {
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundColor(.secondary.opacity(0.6))
 
-                    Text(PaneTreeView.formatTokenCount(pane.tokenCount))
+                    Text(SessionFormatter.formatTokenCount(pane.tokenCount))
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundColor(.secondary)
 
                     if pane.costUSD > 0 {
                         Text(" \u{00B7} ")
                             .foregroundColor(.secondary.opacity(0.5))
-                        Text(PaneTreeView.formatCost(pane.costUSD))
+                        Text(SessionFormatter.formatCost(pane.costUSD))
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
                             .foregroundColor(.secondary)
                     }
@@ -195,25 +195,4 @@ struct PaneRowView: View {
     }
 }
 
-// MARK: - Formatting Helpers
-
-extension PaneTreeView {
-    /// 토큰 수를 읽기 쉽게 포맷한다 (예: 12500 -> 12.5k)
-    static func formatTokenCount(_ count: Int) -> String {
-        if count >= 1_000_000 {
-            return String(format: "%.1fM tokens", Double(count) / 1_000_000.0)
-        } else if count >= 1_000 {
-            return String(format: "%.1fk tokens", Double(count) / 1_000.0)
-        }
-        return "\(count) tokens"
-    }
-
-    /// 비용을 포맷한다 ($0.45 형식)
-    static func formatCost(_ cost: Double) -> String {
-        if cost < 0.01 {
-            return String(format: "$%.3f", cost)
-        }
-        return String(format: "$%.2f", cost)
-    }
-}
 

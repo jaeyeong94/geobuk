@@ -66,59 +66,8 @@ final class PaneTreeViewTests: XCTestCase {
         XCTAssertEqual(info.claudeStatusColor, .gray)
     }
 
-    // MARK: - 토큰 포맷 테스트
-
-    /// 1000 미만 토큰은 그대로 표시해야 한다
-    func test_formatTokenCount_belowThousand() {
-        XCTAssertEqual(PaneTreeView.formatTokenCount(500), "500 tokens")
-    }
-
-    /// 1000 이상 토큰은 k 단위로 표시해야 한다
-    func test_formatTokenCount_thousands() {
-        XCTAssertEqual(PaneTreeView.formatTokenCount(12500), "12.5k tokens")
-    }
-
-    /// 1000000 이상 토큰은 M 단위로 표시해야 한다
-    func test_formatTokenCount_millions() {
-        XCTAssertEqual(PaneTreeView.formatTokenCount(1_500_000), "1.5M tokens")
-    }
-
-    /// 정확히 1000 토큰
-    func test_formatTokenCount_exactlyThousand() {
-        XCTAssertEqual(PaneTreeView.formatTokenCount(1000), "1.0k tokens")
-    }
-
-    /// 0 토큰
-    func test_formatTokenCount_zero() {
-        XCTAssertEqual(PaneTreeView.formatTokenCount(0), "0 tokens")
-    }
-
-    // MARK: - 비용 포맷 테스트
-
-    /// 일반 비용 포맷 ($0.45)
-    func test_formatCost_normalAmount() {
-        XCTAssertEqual(PaneTreeView.formatCost(0.45), "$0.45")
-    }
-
-    /// 소액 비용은 소수점 3자리로 포맷해야 한다
-    func test_formatCost_smallAmount() {
-        XCTAssertEqual(PaneTreeView.formatCost(0.005), "$0.005")
-    }
-
-    /// 0원
-    func test_formatCost_zero() {
-        XCTAssertEqual(PaneTreeView.formatCost(0), "$0.000")
-    }
-
-    /// $0.01 경계값
-    func test_formatCost_boundaryValue() {
-        XCTAssertEqual(PaneTreeView.formatCost(0.01), "$0.01")
-    }
-
-    /// 큰 금액
-    func test_formatCost_largeAmount() {
-        XCTAssertEqual(PaneTreeView.formatCost(12.34), "$12.34")
-    }
+    // MARK: - 토큰/비용 포맷 테스트 (SessionFormatter로 통합됨)
+    // SessionFormatter의 포맷 테스트는 SessionFormatterTests에서 커버함
 
     // MARK: - 네거티브 테스트
 
@@ -128,24 +77,7 @@ final class PaneTreeViewTests: XCTestCase {
         XCTAssertTrue(panes.isEmpty)
     }
 
-    /// 음수 토큰에 대한 포맷이 크래시 없이 동작해야 한다
-    func test_formatTokenCount_negative() {
-        let result = PaneTreeView.formatTokenCount(-100)
-        XCTAssertEqual(result, "-100 tokens")
-    }
-
-    /// 음수 비용에 대한 포맷이 크래시 없이 동작해야 한다
-    func test_formatCost_negative() {
-        let result = PaneTreeView.formatCost(-0.05)
-        // -0.05는 < 0.01이므로 소수점 3자리로 포맷됨
-        XCTAssertEqual(result, "$-0.050")
-    }
-
-    /// 매우 큰 토큰 수도 포맷되어야 한다
-    func test_formatTokenCount_veryLarge() {
-        let result = PaneTreeView.formatTokenCount(999_999_999)
-        XCTAssertEqual(result, "1000.0M tokens")
-    }
+    // 음수/경계값 포맷 테스트는 SessionFormatterTests에서 커버함
 
     // MARK: - PaneTreeInfo ID 일관성 테스트
 

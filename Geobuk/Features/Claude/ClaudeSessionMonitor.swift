@@ -216,6 +216,7 @@ final class ClaudeSessionMonitor {
 
                 let model = sessionModels[sid] ?? detectedModel
                 if let pricing = pricingManager, let model {
+                    state.useExternalPricing = true
                     let cost = pricing.calculateCost(
                         model: model,
                         inputTokens: input,

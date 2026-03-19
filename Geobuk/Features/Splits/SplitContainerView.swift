@@ -127,39 +127,30 @@ struct SplitPaneView: View {
                                 surfaceView.sendText(command)
                                 surfaceView.sendKeyPress(keyCode: 36, char: "\r")
 
-                                // precmd 복귀 감지
-                                let signalFile = "/tmp/geobuk-precmd-\(surfaceView.viewId.uuidString)"
-                                try? FileManager.default.removeItem(atPath: signalFile)
-
                                 Task { @MainActor in
-                                    // 500ms 대기 — 빠른 명령이면 이미 완료됨
+                                    // 500ms 대기 — 빠른 명령이면 셸이 이미 prompt 상태로 복귀함
                                     try? await Task.sleep(nanoseconds: 500_000_000)
 
-                                    if FileManager.default.fileExists(atPath: signalFile) {
-                                        // 빠른 명령: 이미 완료 → 입력창 유지
-                                        try? FileManager.default.removeItem(atPath: signalFile)
+                                    // 빠른 명령 판별: 이미 prompt 알림을 받았으면 입력창 유지
+                                    // (promptReceived는 onReceive에서 설정됨)
+                                    // 여기서는 TUI 모드 전환만 담당하고, 복귀는 알림으로 처리
+                                    if !surfaceView.isCommandRunning {
+                                        // 아직 running 전환 전인데 prompt가 왔으면 빠른 명령
                                         return
                                     }
 
                                     // 느린 명령: TUI 모드로 전환
-                                    surfaceView.isCommandRunning = true; isRunning = true
                                     surfaceView.blockInputMode = false
                                     surfaceView.window?.makeFirstResponder(surfaceView)
+                                }
 
-                                    // 완료 대기
-                                    for _ in 0..<6000 {
-                                        try? await Task.sleep(nanoseconds: 100_000_000)
-                                        if FileManager.default.fileExists(atPath: signalFile) {
-                                            try? FileManager.default.removeItem(atPath: signalFile)
-                                            break
-                                        }
+                                // 느린 명령 대비: running 상태로 전환 예약
+                                Task { @MainActor in
+                                    try? await Task.sleep(nanoseconds: 500_000_000)
+                                    // 500ms 후에도 prompt 알림이 안 왔으면 느린 명령
+                                    if !surfaceView.isCommandRunning {
+                                        surfaceView.isCommandRunning = true; isRunning = true
                                     }
-
-                                    // 블록 입력 모드 복귀
-                                    surfaceView.isCommandRunning = false; isRunning = false
-                                    surfaceView.blockInputMode = true
-                                    // 입력창에 포커스 복귀
-                                    inputFocusTrigger.toggle()
                                 }
                             },
                             onTab: {
@@ -193,6 +184,19 @@ struct SplitPaneView: View {
         .border(isFocused ? Color.blue.opacity(0.6) : Color.gray.opacity(0.2), width: 1)
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
+        .onReceive(NotificationCenter.default.publisher(for: .geobukShellPromptReady)) { notification in
+            guard case .terminal = content,
+                  let surfaceView = surfaceViewProvider(content.id),
+                  let sid = notification.userInfo?["surfaceId"] as? String,
+                  sid == surfaceView.viewId.uuidString else { return }
+
+            // 명령 완료 → 블록 입력 모드로 복귀
+            if surfaceView.isCommandRunning {
+                surfaceView.isCommandRunning = false; isRunning = false
+                surfaceView.blockInputMode = true
+                inputFocusTrigger.toggle()
+            }
+        }
     }
 }
 

@@ -39,9 +39,12 @@ final class ClaudeSessionState: AISessionMonitor, @unchecked Sendable {
     /// 팀원 상태 목록 (Agent Team 모니터링용)
     private(set) var teammates: [TeammateState] = []
 
+    /// 외부 가격 매니저 사용 여부 (true이면 recalculateCost를 건너뜀)
+    var useExternalPricing: Bool = false
+
     // MARK: - 비용 계산 상수 (USD per token)
 
-    /// Claude 모델 토큰 단가
+    /// Claude 모델 토큰 단가 (fallback용 하드코딩 단가)
     private enum Pricing {
         static let inputPerToken: Double = 3.0 / 1_000_000.0
         static let outputPerToken: Double = 15.0 / 1_000_000.0
@@ -107,7 +110,9 @@ final class ClaudeSessionState: AISessionMonitor, @unchecked Sendable {
     // MARK: - Private
 
     /// 현재 토큰 사용량 기반으로 비용을 재계산한다 (하드코딩 단가, fallback)
+    /// useExternalPricing이 true이면 외부 가격 매니저가 addCost()로 비용을 관리하므로 건너뜀
     private func recalculateCost() {
+        guard !useExternalPricing else { return }
         costUSD = Double(tokenUsage.inputTokens) * Pricing.inputPerToken
             + Double(tokenUsage.outputTokens) * Pricing.outputPerToken
             + Double(tokenUsage.cacheReadTokens) * Pricing.cacheReadPerToken

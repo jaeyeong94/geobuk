@@ -77,9 +77,8 @@ final class ClaudeSessionFileWatcher {
             }
 
             // 프로세스가 아직 실행 중인지 확인
+            // 종료된 세션은 건너뜀 (Claude Code의 파일이므로 삭제하지 않음)
             guard ProcessTreeScanner.processExists(pid: pid_t(pid)) else {
-                // 종료된 세션 파일 정리
-                try? fm.removeItem(atPath: fullPath)
                 continue
             }
 

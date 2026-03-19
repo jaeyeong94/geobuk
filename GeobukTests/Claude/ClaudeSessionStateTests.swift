@@ -18,7 +18,7 @@ struct ClaudeSessionStateTests {
         #expect(state.startedAt == nil)
     }
 
-    @Test("processEvent_initイベント_sessionActiveに遷移")
+    @Test("processEvent_init이벤트_sessionActive로전환")
     func processEvent_initEvent_transitionsToSessionActive() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "sess-001"))
@@ -27,7 +27,7 @@ struct ClaudeSessionStateTests {
         #expect(state.startedAt != nil)
     }
 
-    @Test("processEvent_assistantText_respondingに遷移")
+    @Test("processEvent_assistantText_responding으로전환")
     func processEvent_assistantText_transitionsToResponding() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -35,7 +35,7 @@ struct ClaudeSessionStateTests {
         #expect(state.phase == .responding)
     }
 
-    @Test("processEvent_toolUse_toolExecutingに遷移してツール名設定")
+    @Test("processEvent_toolUse_toolExecuting으로전환_도구명설정")
     func processEvent_toolUse_transitionsToToolExecutingWithToolName() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -44,7 +44,7 @@ struct ClaudeSessionStateTests {
         #expect(state.currentToolName == "Edit")
     }
 
-    @Test("processEvent_toolResult_toolCompleteを経てrespondingに遷移")
+    @Test("processEvent_toolResult_responding으로전환")
     func processEvent_toolResult_transitionsToResponding() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -54,7 +54,7 @@ struct ClaudeSessionStateTests {
         #expect(state.currentToolName == nil)
     }
 
-    @Test("processEvent_permissionRequest_waitingForInputに遷移")
+    @Test("processEvent_permissionRequest_waitingForInput으로전환")
     func processEvent_permissionRequest_transitionsToWaitingForInput() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -63,7 +63,7 @@ struct ClaudeSessionStateTests {
         #expect(state.currentToolName == "Bash")
     }
 
-    @Test("processEvent_resultSuccess_sessionCompleteに遷移")
+    @Test("processEvent_resultSuccess_sessionComplete로전환")
     func processEvent_resultSuccess_transitionsToSessionComplete() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -72,7 +72,7 @@ struct ClaudeSessionStateTests {
         #expect(state.phase == .sessionComplete)
     }
 
-    @Test("processEvent_usage_トークン使用量累積")
+    @Test("processEvent_usage_토큰사용량누적")
     func processEvent_usage_accumulatesTokenUsage() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -81,7 +81,7 @@ struct ClaudeSessionStateTests {
         #expect(state.tokenUsage.outputTokens == 200)
     }
 
-    @Test("processEvent_usage複数回_累積される")
+    @Test("processEvent_usage_여러번_누적됨")
     func processEvent_multipleUsage_accumulates() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -91,7 +91,7 @@ struct ClaudeSessionStateTests {
         #expect(state.tokenUsage.outputTokens == 300)
     }
 
-    @Test("processEvent_usage_コスト正確に計算")
+    @Test("processEvent_usage_비용정확히계산")
     func processEvent_usage_calculatesCorrectCost() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -101,7 +101,7 @@ struct ClaudeSessionStateTests {
         #expect(state.costUSD == 18.0)
     }
 
-    @Test("processEvent_usage少量トークン_コスト正確")
+    @Test("processEvent_usage_소량토큰_비용정확")
     func processEvent_usage_smallTokens_accurateCost() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -112,7 +112,7 @@ struct ClaudeSessionStateTests {
         #expect(abs(state.costUSD - expectedCost) < 0.000001)
     }
 
-    @Test("reset_全状態クリア")
+    @Test("reset_전체상태초기화")
     func reset_clearsAllState() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -127,23 +127,23 @@ struct ClaudeSessionStateTests {
         #expect(state.startedAt == nil)
     }
 
-    // MARK: - ネガティブテスト (Negative Tests)
+    // MARK: - 네거티브 테스트 (Negative Tests)
 
-    @Test("processEvent_idle状態でtoolResult_無視")
+    @Test("processEvent_idle상태에서toolResult_무시")
     func processEvent_toolResultInIdleState_ignored() {
         let state = ClaudeSessionState()
         state.processEvent(.toolResult(id: "tu-1", content: "ok"))
         #expect(state.phase == .idle)
     }
 
-    @Test("processEvent_idle状態でassistantMessage_無視")
+    @Test("processEvent_idle상태에서assistantMessage_무시")
     func processEvent_assistantMessageInIdleState_ignored() {
         let state = ClaudeSessionState()
         state.processEvent(.assistantMessage(text: "hello"))
         #expect(state.phase == .idle)
     }
 
-    @Test("processEvent_unknownイベント_状態変更なし")
+    @Test("processEvent_unknown이벤트_상태변경없음")
     func processEvent_unknownEvent_noStateChange() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -151,7 +151,7 @@ struct ClaudeSessionStateTests {
         #expect(state.phase == .sessionActive)
     }
 
-    @Test("processEvent_複数セッション_リセット間で正常動作")
+    @Test("processEvent_복수세션_리셋사이정상동작")
     func processEvent_multipleSessions_workCorrectlyBetweenResets() {
         let state = ClaudeSessionState()
         // First session
@@ -172,7 +172,7 @@ struct ClaudeSessionStateTests {
         #expect(state.tokenUsage.totalTokens == 0)
     }
 
-    @Test("processEvent_toolUse連続_最新のツール名を保持")
+    @Test("processEvent_toolUse연속_최신도구명유지")
     func processEvent_consecutiveToolUse_keepsLatestToolName() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))
@@ -183,9 +183,9 @@ struct ClaudeSessionStateTests {
         #expect(state.phase == .toolExecuting)
     }
 
-    // MARK: - AISessionMonitor準拠テスト
+    // MARK: - AISessionMonitor 준수 테스트
 
-    @Test("AISessionMonitor準拠_プロパティアクセス可能")
+    @Test("AISessionMonitor준수_프로퍼티접근가능")
     func conformsToAISessionMonitor() {
         let state = ClaudeSessionState()
         let monitor: any AISessionMonitor = state
@@ -198,7 +198,7 @@ struct ClaudeSessionStateTests {
 
     // MARK: - 퍼징 테스트 (Fuzz Tests)
 
-    @Test("processEvent_ランダムイベントシーケンス_クラッシュしない")
+    @Test("processEvent_랜덤이벤트시퀀스_크래시없음")
     func processEvent_randomEventSequence_doesNotCrash() {
         let state = ClaudeSessionState()
         let events: [StreamJSONEvent] = [
@@ -218,7 +218,7 @@ struct ClaudeSessionStateTests {
         // If we get here, no crash occurred
     }
 
-    @Test("processEvent_usage_ゼロトークン_コスト0")
+    @Test("processEvent_usage_제로토큰_비용0")
     func processEvent_usage_zeroTokens_zeroCost() {
         let state = ClaudeSessionState()
         state.processEvent(.sessionInit(sessionId: "s1"))

@@ -29,9 +29,6 @@ _geobuk_precmd() {
     local exit_code=$?
     _geobuk_send '{"jsonrpc":"2.0","method":"shell.reportState","params":{"surfaceId":"'"$GEOBUK_SURFACE_ID"'","state":"prompt"}}'
 
-    # 블록 입력 모드 복귀 시그널 (앱이 이 파일을 감지하여 모드 전환)
-    touch "/tmp/geobuk-precmd-${GEOBUK_SURFACE_ID}" 2>/dev/null
-
     # 블록 하단 여백 (첫 프롬프트는 스킵)
     if [[ -n "$_GEOBUK_CMD_RUNNING" ]]; then
         unset _GEOBUK_CMD_RUNNING

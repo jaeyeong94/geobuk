@@ -189,10 +189,9 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     }
 
     deinit {
-        // Surface 해제는 반드시 main thread에서
-        if let surface {
-            ghostty_surface_free(surface)
-        }
+        // close()에서 이미 해제하고 nil로 설정했으므로 deinit에서는 해제하지 않는다.
+        // nonisolated(unsafe) 속성은 다른 스레드에서 nil 상태가 보이지 않을 수 있어
+        // double-free 위험이 있다. 호출부에서 반드시 close()를 먼저 호출해야 한다.
     }
 
     // MARK: - View Lifecycle

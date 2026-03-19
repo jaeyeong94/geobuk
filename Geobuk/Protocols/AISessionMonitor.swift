@@ -6,6 +6,7 @@ enum AISessionPhase: String, Sendable {
     case sessionActive
     case responding
     case toolExecuting
+    /// 현재 사용되지 않음 (향후 도구 완료 상태 표시를 위해 예약됨)
     case toolComplete
     case waitingForInput
     case sessionComplete

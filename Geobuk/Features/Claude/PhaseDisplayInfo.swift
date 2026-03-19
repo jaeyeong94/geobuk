@@ -1,10 +1,22 @@
 import Foundation
+import SwiftUI
 
 /// AI 세션 단계의 표시 정보를 제공하는 구조체
 struct PhaseDisplayInfo: Sendable {
     let label: String
     let systemImage: String
     let colorName: String
+
+    /// colorName을 SwiftUI Color로 변환한다
+    var color: Color {
+        switch colorName {
+        case "green": return .green
+        case "blue": return .blue
+        case "yellow": return .yellow
+        case "gray": return .gray
+        default: return .gray
+        }
+    }
 
     /// AISessionPhase에 대응하는 표시 정보를 반환한다
     static func from(phase: AISessionPhase) -> PhaseDisplayInfo {

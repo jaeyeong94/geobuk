@@ -296,7 +296,7 @@ struct SidebarView: View {
                 HStack(spacing: 4) {
                     if let state = claudeMonitor?.getState(for: session.sessionId),
                        state.tokenUsage.totalTokens > 0 {
-                        Text(formatTokenCount(state.tokenUsage.totalTokens))
+                        Text(SessionFormatter.formatTokenCount(state.tokenUsage.totalTokens))
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundColor(.secondary)
                     }
@@ -363,16 +363,6 @@ struct SidebarView: View {
         case .sessionComplete: return "Complete"
         case .idle: return "Idle"
         }
-    }
-
-    /// 토큰 수를 읽기 쉽게 포맷한다 (예: 12500 -> 12.5k)
-    private func formatTokenCount(_ count: Int) -> String {
-        if count >= 1_000_000 {
-            return String(format: "%.1fM", Double(count) / 1_000_000.0)
-        } else if count >= 1_000 {
-            return String(format: "%.1fk", Double(count) / 1_000.0)
-        }
-        return "\(count)"
     }
 
     /// 밀리초를 읽기 쉽게 포맷 (12345 → "12.3s", 65432 → "1m 5s")
@@ -546,7 +536,7 @@ struct WorkspaceTabView: View {
                                 .font(.system(size: 9, weight: .medium))
                                 .foregroundColor(.green)
                             if totalCost > 0 {
-                                Text(WorkspaceTabView.formatCost(totalCost))
+                                Text(SessionFormatter.formatCost(totalCost))
                                     .font(.system(size: 9, weight: .medium, design: .monospaced))
                                     .foregroundColor(.secondary)
                             }
@@ -593,11 +583,4 @@ struct WorkspaceTabView: View {
         PathAbbreviator.abbreviate(path)
     }
 
-    /// 비용을 포맷한다 ($0.45 형식)
-    static func formatCost(_ cost: Double) -> String {
-        if cost < 0.01 {
-            return String(format: "$%.3f", cost)
-        }
-        return String(format: "$%.2f", cost)
-    }
 }

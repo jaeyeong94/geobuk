@@ -34,7 +34,7 @@ struct ClaudeSessionPanel: View {
                     let phaseInfo = PhaseDisplayInfo.from(phase: monitor.sessionState.phase)
                     Image(systemName: phaseInfo.systemImage)
                         .font(.system(size: 9))
-                        .foregroundColor(phaseColor(phaseInfo.colorName))
+                        .foregroundColor(phaseInfo.color)
 
                     Text("Claude")
                         .font(.system(size: 11, weight: .medium))
@@ -43,7 +43,7 @@ struct ClaudeSessionPanel: View {
                     if monitor.sessionState.phase != .idle {
                         Text(phaseInfo.label)
                             .font(.system(size: 10))
-                            .foregroundColor(phaseColor(phaseInfo.colorName))
+                            .foregroundColor(phaseInfo.color)
                     }
                 }
             }
@@ -100,15 +100,4 @@ struct ClaudeSessionPanel: View {
         .padding(.vertical, 8)
     }
 
-    // MARK: - Helpers
-
-    private func phaseColor(_ name: String) -> Color {
-        switch name {
-        case "green": return .green
-        case "blue": return .blue
-        case "yellow": return .yellow
-        case "gray": return .gray
-        default: return .gray
-        }
-    }
 }

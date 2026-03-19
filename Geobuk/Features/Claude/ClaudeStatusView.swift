@@ -14,7 +14,7 @@ struct ClaudeStatusView: View {
             // 헤더: 상태 표시
             HStack(spacing: 6) {
                 Image(systemName: phaseInfo.systemImage)
-                    .foregroundColor(phaseColor(phaseInfo.colorName))
+                    .foregroundColor(phaseInfo.color)
                     .font(.system(size: 10))
 
                 Text("Claude Session")
@@ -24,7 +24,7 @@ struct ClaudeStatusView: View {
                 if sessionState.phase != .idle {
                     Text(phaseInfo.label)
                         .font(.system(size: 10))
-                        .foregroundColor(phaseColor(phaseInfo.colorName))
+                        .foregroundColor(phaseInfo.color)
                 }
 
                 Spacer()
@@ -142,17 +142,6 @@ struct ClaudeStatusView: View {
         timer = nil
     }
 
-    // MARK: - Helpers
-
-    private func phaseColor(_ name: String) -> Color {
-        switch name {
-        case "green": return .green
-        case "blue": return .blue
-        case "yellow": return .yellow
-        case "gray": return .gray
-        default: return .gray
-        }
-    }
 }
 
 // MARK: - Teammate Row
@@ -166,7 +155,7 @@ private struct TeammateRow: View {
 
         HStack(spacing: 4) {
             Image(systemName: phaseInfo.systemImage)
-                .foregroundColor(rowPhaseColor(phaseInfo.colorName))
+                .foregroundColor(phaseInfo.color)
                 .font(.system(size: 8))
 
             Text(teammate.name)
@@ -197,13 +186,4 @@ private struct TeammateRow: View {
         }
     }
 
-    private func rowPhaseColor(_ name: String) -> Color {
-        switch name {
-        case "green": return .green
-        case "blue": return .blue
-        case "yellow": return .yellow
-        case "gray": return .gray
-        default: return .gray
-        }
-    }
 }

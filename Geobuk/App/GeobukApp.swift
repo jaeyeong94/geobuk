@@ -102,7 +102,6 @@ struct GeobukApp: App {
 }
 
 extension Notification.Name {
-    static let newTerminalTab = Notification.Name("newTerminalTab")
     static let splitHorizontally = Notification.Name("splitHorizontally")
     static let splitVertically = Notification.Name("splitVertically")
     static let toggleMaximize = Notification.Name("toggleMaximize")
