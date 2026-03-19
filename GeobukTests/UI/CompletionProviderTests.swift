@@ -298,6 +298,208 @@ struct CompletionProviderTests {
         }
     }
 
+    // MARK: - 복수 후보 목록 (suggestAll)
+
+    @Suite("복수 후보 목록")
+    struct SuggestAllTests {
+
+        @Test("공통명령어_복수후보반환")
+        func commonCommands_multipleResults() {
+            let results = CompletionProvider.suggestAll(
+                for: "gi",
+                currentDirectory: nil,
+                history: CommandHistory()
+            )
+            // "git", "gzip", "gunzip" 등 gi로 시작하는 명령어들
+            #expect(results.count >= 1)
+            #expect(results.contains("git"))
+        }
+
+        @Test("파일경로_복수후보반환")
+        func filePath_multipleResults() {
+            // /usr 에는 여러 디렉토리가 있음
+            let results = CompletionProvider.suggestAll(
+                for: "ls /usr/",
+                currentDirectory: nil,
+                history: CommandHistory()
+            )
+            // bin, lib, local 등
+            #expect(results.count >= 2)
+        }
+
+        @Test("히스토리_복수후보반환")
+        func history_multipleResults() {
+            var history = CommandHistory()
+            history.add("git add .")
+            history.add("git commit -m 'fix'")
+            history.add("git push")
+            let results = CompletionProvider.suggestAll(
+                for: "git",
+                currentDirectory: nil,
+                history: history
+            )
+            #expect(results.count == 3)
+            // 최근 항목이 먼저
+            #expect(results[0] == "git push")
+            #expect(results[1] == "git commit -m 'fix'")
+            #expect(results[2] == "git add .")
+        }
+
+        @Test("후보1개면_단일항목반환")
+        func singleCandidate_returnsOne() {
+            let results = CompletionProvider.suggestAll(
+                for: "xcodeb",
+                currentDirectory: nil,
+                history: CommandHistory()
+            )
+            #expect(results.count == 1)
+            #expect(results.first == "xcodebuild")
+        }
+
+        @Test("매칭없음_빈배열반환")
+        func noMatch_returnsEmpty() {
+            let results = CompletionProvider.suggestAll(
+                for: "zzzzz",
+                currentDirectory: nil,
+                history: CommandHistory()
+            )
+            #expect(results.isEmpty)
+        }
+
+        @Test("최소길이미달_빈배열반환")
+        func tooShort_returnsEmpty() {
+            let results = CompletionProvider.suggestAll(
+                for: "g",
+                currentDirectory: nil,
+                history: CommandHistory()
+            )
+            #expect(results.isEmpty)
+        }
+
+        @Test("정확일치_후보에포함안됨")
+        func exactMatch_excluded() {
+            var history = CommandHistory()
+            history.add("git")
+            let results = CompletionProvider.suggestAll(
+                for: "git",
+                currentDirectory: nil,
+                history: history
+            )
+            // "git" 정확 일치는 후보에서 제외
+            #expect(!results.contains("git"))
+        }
+
+        @Test("maxResults제한")
+        func maxResults_limits() {
+            var history = CommandHistory()
+            for i in 0..<20 {
+                history.add("test command \(i)")
+            }
+            let results = CompletionProvider.suggestAll(
+                for: "test",
+                currentDirectory: nil,
+                history: history,
+                maxResults: 5
+            )
+            #expect(results.count <= 5)
+        }
+
+        @Test("중복제거_동일후보는한번만")
+        func dedup_noDuplicates() {
+            var history = CommandHistory()
+            history.add("git status")
+            history.add("git pull")
+            history.add("git status") // 중복 (CommandHistory가 연속 중복만 제거)
+            let results = CompletionProvider.suggestAll(
+                for: "git",
+                currentDirectory: nil,
+                history: history
+            )
+            let unique = Set(results)
+            #expect(results.count == unique.count)
+        }
+
+        @Test("파일경로와히스토리_혼합결과")
+        func mixedSources_combinedResults() {
+            var history = CommandHistory()
+            history.add("cd /tmp/testdir")
+            let results = CompletionProvider.suggestAll(
+                for: "cd /tmp",
+                currentDirectory: nil,
+                history: history
+            )
+            // 히스토리 후보 + 파일 경로 후보가 혼합
+            #expect(results.count >= 1)
+        }
+    }
+
+    // MARK: - CWD 기반 파일명 완성
+
+    @Suite("CWD 기반 파일명 완성")
+    struct CwdCompletionTests {
+
+        @Test("currentDirectory에서_파일명prefix완성")
+        func cwdFileCompletion_matchesPrefix() {
+            // /usr 디렉토리에서 "bi" 입력 → "n" 힌트 (bin)
+            let hint = CompletionProvider.cwdFileCompletion(for: "bi", currentDirectory: "/usr")
+            #expect(hint == "n")
+        }
+
+        @Test("슬래시포함_cwdCompletionSkip")
+        func cwdFileCompletion_skipsPathInput() {
+            let hint = CompletionProvider.cwdFileCompletion(for: "/usr/bi", currentDirectory: "/usr")
+            #expect(hint == nil) // 슬래시 포함이면 기존 filePathCompletion이 처리
+        }
+
+        @Test("공백뒤토큰으로완성")
+        func cwdFileCompletion_afterSpace() {
+            // "cd bi" → 마지막 토큰 "bi" → /usr에서 "bin" 매칭 → "n"
+            let hint = CompletionProvider.cwdFileCompletion(for: "cd bi", currentDirectory: "/usr")
+            #expect(hint == "n")
+        }
+
+        @Test("매칭없음_힌트없음")
+        func cwdFileCompletion_noMatch() {
+            let hint = CompletionProvider.cwdFileCompletion(for: "zzz_not_exist", currentDirectory: "/usr")
+            #expect(hint == nil)
+        }
+
+        @Test("suggest에서_cwd기반완성도동작")
+        func suggest_usesCwd() {
+            // /usr에서 "bi" 입력 → "n" 힌트 (bin)
+            let hint = CompletionProvider.suggest(
+                for: "bi",
+                currentDirectory: "/usr",
+                history: CommandHistory()
+            )
+            #expect(hint == "n")
+        }
+
+        @Test("suggestAll에서_cwd기반후보반환")
+        func suggestAll_usesCwd() {
+            let results = CompletionProvider.suggestAll(
+                for: "li",
+                currentDirectory: "/usr",
+                history: CommandHistory()
+            )
+            // /usr에 lib, libexec 등이 있을 수 있음
+            #expect(results.count >= 1)
+        }
+
+        @Test("cwdFileCandidates_복수후보반환")
+        func cwdFileCandidates_multipleResults() {
+            let results = CompletionProvider.cwdFileCandidates(
+                for: "cd li",
+                currentDirectory: "/usr"
+            )
+            // "cd lib", "cd libexec" 등
+            #expect(results.count >= 1)
+            for r in results {
+                #expect(r.hasPrefix("cd li"))
+            }
+        }
+    }
+
     // MARK: - 퍼징 / 랜덤 입력
 
     @Suite("퍼징 테스트")

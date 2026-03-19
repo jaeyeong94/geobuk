@@ -60,6 +60,9 @@ struct SplitPaneView: View {
     /// 입력창 포커스 트리거 (토글할 때마다 포커스)
     @State private var inputFocusTrigger = false
 
+    /// 현재 작업 디렉토리 (surfaceView.currentDirectory를 SwiftUI에서 추적)
+    @State private var currentDir: String? = nil
+
     var body: some View {
         ZStack {
             switch content {
@@ -72,6 +75,7 @@ struct SplitPaneView: View {
                             )
                             .onAppear {
                                 if !surfaceView.isCommandRunning { surfaceView.blockInputMode = true }; isRunning = surfaceView.isCommandRunning
+                                currentDir = surfaceView.currentDirectory
                             }
 
                             // 셸 영역 클릭 처리
@@ -108,6 +112,7 @@ struct SplitPaneView: View {
                                             try? await Task.sleep(nanoseconds: 50_000_000)
                                             if surfaceView.currentDirectory != nil { break }
                                         }
+                                        currentDir = surfaceView.currentDirectory
                                         withAnimation(.easeOut(duration: 0.2)) {
                                             showInitOverlay = false
                                         }
@@ -122,7 +127,7 @@ struct SplitPaneView: View {
                                 get: { surfaceView.pendingInputText },
                                 set: { surfaceView.pendingInputText = $0 }
                             ),
-                            currentDirectory: surfaceView.currentDirectory,
+                            currentDirectory: currentDir,
                             onSubmit: { command in
                                 surfaceView.pendingCommandSubmitted = true
                                 surfaceView.sendText(command)
@@ -140,6 +145,7 @@ struct SplitPaneView: View {
                                     if FileManager.default.fileExists(atPath: signalFile) || !surfaceView.pendingCommandSubmitted {
                                         try? FileManager.default.removeItem(atPath: signalFile)
                                         surfaceView.pendingCommandSubmitted = false
+                                        currentDir = surfaceView.currentDirectory
                                         return
                                     }
 
@@ -161,6 +167,7 @@ struct SplitPaneView: View {
                                     // 블록 입력 모드 복귀
                                     surfaceView.isCommandRunning = false; isRunning = false
                                     surfaceView.blockInputMode = true
+                                    currentDir = surfaceView.currentDirectory
                                     inputFocusTrigger.toggle()
                                 }
                             },
@@ -207,7 +214,11 @@ struct SplitPaneView: View {
             if surfaceView.isCommandRunning {
                 surfaceView.isCommandRunning = false; isRunning = false
                 surfaceView.blockInputMode = true
+                currentDir = surfaceView.currentDirectory
                 inputFocusTrigger.toggle()
+            } else {
+                // 빠른 명령도 CWD 갱신
+                currentDir = surfaceView.currentDirectory
             }
         }
     }

@@ -21,6 +21,12 @@ final class ShellStateManager {
     /// surfaceId -> 셸 상태
     private(set) var shellStates: [String: ShellState] = [:]
 
+    /// surfaceId -> 캐시된 리스닝 포트
+    private(set) var cachedListeningPorts: [String: [UInt16]] = [:]
+
+    /// 포트/프로세스 폴링 태스크
+    private var portPollingTask: Task<Void, Never>?
+
     /// TTY 이름을 등록한다
     func reportTty(surfaceId: String, tty: String) {
         ttyNames[surfaceId] = tty
@@ -72,24 +78,57 @@ extension ShellStateManager {
         return nil
     }
 
-    /// 패널의 TTY에서 실행 중인 프로세스 목록 (셸 제외)
-    func processesForSurface(_ surfaceId: String) -> [ProcInfo] {
-        guard let tty = ttyNames[surfaceId] else { return [] }
-        // /dev/ttys014 → ttys014
-        let ttyShort = tty.replacingOccurrences(of: "/dev/", with: "")
-        return Self.processesOnTTY(ttyShort)
+    // MARK: - Cached Process/Port Info (비동기 갱신)
+
+    /// 포트/프로세스 정보 폴링을 시작한다 (5초 주기)
+    func startPortPolling() {
+        guard portPollingTask == nil else { return }
+        portPollingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                await self.refreshPortsForAllSurfaces()
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
     }
 
-    /// 패널의 프로세스들이 리스닝하는 포트 목록
+    /// 포트/프로세스 정보 폴링을 중지한다
+    func stopPortPolling() {
+        portPollingTask?.cancel()
+        portPollingTask = nil
+    }
+
+    /// 패널의 캐시된 리스닝 포트를 반환한다 (동기, View에서 안전하게 호출 가능)
     func listeningPortsForSurface(_ surfaceId: String) -> [UInt16] {
-        let procs = processesForSurface(surfaceId)
-        guard !procs.isEmpty else { return [] }
-        let pids = procs.map { $0.pid }
-        return Self.listeningPortsForPIDs(pids)
+        cachedListeningPorts[surfaceId] ?? []
+    }
+
+    /// 모든 surface의 포트 정보를 백그라운드에서 갱신한다
+    private func refreshPortsForAllSurfaces() async {
+        let surfaceIds = Array(ttyNames.keys)
+        let ttyMap = ttyNames
+
+        let results = await Task.detached(priority: .utility) {
+            var portMap: [String: [UInt16]] = [:]
+            for surfaceId in surfaceIds {
+                guard let tty = ttyMap[surfaceId] else { continue }
+                let ttyShort = tty.replacingOccurrences(of: "/dev/", with: "")
+                let procs = ShellStateManager.processesOnTTY(ttyShort)
+                guard !procs.isEmpty else { continue }
+                let pids = procs.map { $0.pid }
+                let ports = ShellStateManager.listeningPortsForPIDs(pids)
+                if !ports.isEmpty {
+                    portMap[surfaceId] = ports
+                }
+            }
+            return portMap
+        }.value
+
+        cachedListeningPorts = results
     }
 
     /// TTY에서 실행 중인 프로세스 조회 (ps -t)
-    private static func processesOnTTY(_ ttyName: String) -> [ProcInfo] {
+    nonisolated static func processesOnTTY(_ ttyName: String) -> [ProcInfo] {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/ps")
         task.arguments = ["-t", ttyName, "-o", "pid=,comm="]
@@ -105,6 +144,11 @@ extension ShellStateManager {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         guard let output = String(data: data, encoding: .utf8) else { return [] }
 
+        return parsePsOutput(output)
+    }
+
+    /// ps 출력을 파싱한다
+    nonisolated static func parsePsOutput(_ output: String) -> [ProcInfo] {
         var results: [ProcInfo] = []
         for line in output.components(separatedBy: "\n") {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -121,7 +165,7 @@ extension ShellStateManager {
     }
 
     /// PID 목록의 리스닝 포트 조회 (lsof)
-    private static func listeningPortsForPIDs(_ pids: [pid_t]) -> [UInt16] {
+    nonisolated static func listeningPortsForPIDs(_ pids: [pid_t]) -> [UInt16] {
         guard !pids.isEmpty else { return [] }
         let pidList = pids.map { String($0) }.joined(separator: ",")
 

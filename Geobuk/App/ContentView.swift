@@ -273,6 +273,9 @@ struct ContentView: View {
             // 시스템 모니터 시작
             systemMonitor.startMonitoring()
 
+            // 셸 포트 폴링 시작
+            shellStateManager.startPortPolling()
+
             // Claude 가격 fetch + 모니터/설정 연결
             claudeMonitor.pricingManager = pricingManager
             claudeLaunchSettings.pricingManager = pricingManager

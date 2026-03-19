@@ -53,7 +53,74 @@ final class CompletionProvider {
             return hint
         }
 
+        // 4순위: currentDirectory 기반 파일명 완성 (/, ~ 없이 마지막 토큰)
+        if let cwd = currentDirectory {
+            if let hint = cwdFileCompletion(for: input, currentDirectory: cwd) {
+                return hint
+            }
+        }
+
         return nil
+    }
+
+    // MARK: - Multi-Candidate API
+
+    /// 현재 입력에 대한 완성 후보 목록을 반환한다 (전체 명령어 형태)
+    /// - Parameters:
+    ///   - input: 사용자가 현재 입력한 문자열
+    ///   - currentDirectory: 셸의 현재 작업 디렉토리 (nil 허용)
+    ///   - history: 명령어 히스토리
+    ///   - maxResults: 최대 반환 개수 (기본 10)
+    /// - Returns: 완성된 전체 문자열 목록 (중복 없음)
+    static func suggestAll(
+        for input: String,
+        currentDirectory: String?,
+        history: CommandHistory,
+        maxResults: Int = 10
+    ) -> [String] {
+        guard input.count >= 2 else { return [] }
+
+        var results: [String] = []
+        var seen: Set<String> = []
+
+        // 1순위: 히스토리 기반 (최근 우선)
+        for cmd in history.commands.reversed() {
+            guard cmd.hasPrefix(input), cmd != input else { continue }
+            if seen.insert(cmd).inserted {
+                results.append(cmd)
+            }
+        }
+
+        // 2순위: 파일 경로 완성
+        if input.contains("/") || input.contains("~") {
+            let pathCandidates = filePathCandidates(for: input, currentDirectory: currentDirectory)
+            for candidate in pathCandidates {
+                if seen.insert(candidate).inserted {
+                    results.append(candidate)
+                }
+            }
+        }
+
+        // 3순위: 공통 명령어 완성 (공백 없을 때만)
+        if !input.contains(" ") {
+            for cmd in commonCommands where cmd.hasPrefix(input) && cmd != input {
+                if seen.insert(cmd).inserted {
+                    results.append(cmd)
+                }
+            }
+        }
+
+        // 4순위: currentDirectory 기반 파일명 완성 (/, ~ 없이 마지막 토큰)
+        if let cwd = currentDirectory {
+            let cwdCandidates = cwdFileCandidates(for: input, currentDirectory: cwd)
+            for candidate in cwdCandidates {
+                if seen.insert(candidate).inserted {
+                    results.append(candidate)
+                }
+            }
+        }
+
+        return Array(results.prefix(maxResults))
     }
 
     // MARK: - File Path Completion
@@ -94,6 +161,49 @@ final class CompletionProvider {
         return String(match.dropFirst(filePrefix.count))
     }
 
+    /// 파일 경로 자동완성 후보 목록 (전체 입력 + 매칭된 파일 이름)
+    static func filePathCandidates(
+        for input: String,
+        currentDirectory: String?
+    ) -> [String] {
+        let pathToken = extractPathToken(from: input)
+        guard !pathToken.isEmpty else { return [] }
+
+        let expandedToken = expandTilde(pathToken)
+        let (dirPath, filePrefix) = splitPathComponents(expandedToken, currentDirectory: currentDirectory)
+        guard let dirPath else { return [] }
+
+        let contents: [String]
+        do {
+            contents = try FileManager.default.contentsOfDirectory(atPath: dirPath)
+        } catch {
+            return []
+        }
+
+        // input에서 pathToken 앞부분 (명령어 부분)
+        let commandPrefix: String
+        if let lastSpaceIndex = input.lastIndex(of: " ") {
+            commandPrefix = String(input[...lastSpaceIndex])
+        } else {
+            commandPrefix = ""
+        }
+
+        let filtered: [String]
+        if filePrefix.isEmpty {
+            // 디렉토리 내용 전체 (예: "cd /usr/" → /usr/ 내 모든 항목)
+            filtered = contents.sorted().filter { !$0.hasPrefix(".") }
+        } else {
+            filtered = contents.sorted().filter { $0.hasPrefix(filePrefix) && $0 != filePrefix }
+        }
+
+        return filtered.map { match in
+            let completedPath = filePrefix.isEmpty
+                ? pathToken + match
+                : String(pathToken.dropLast(filePrefix.count)) + match
+            return commandPrefix + completedPath
+        }
+    }
+
     // MARK: - History Completion
 
     /// 히스토리 기반 자동완성
@@ -123,6 +233,48 @@ final class CompletionProvider {
         }
         guard let match else { return nil }
         return String(match.dropFirst(input.count))
+    }
+
+    // MARK: - CWD-based File Completion
+
+    /// currentDirectory에서 마지막 토큰으로 파일명을 완성한다 (인라인 힌트)
+    /// 예: cwd="/Users/ted", input="cd Webstorm" → "Projects"
+    static func cwdFileCompletion(for input: String, currentDirectory: String) -> String? {
+        let token = extractPathToken(from: input)
+        guard token.count >= 2, !token.contains("/"), !token.contains("~") else { return nil }
+
+        let contents: [String]
+        do {
+            contents = try FileManager.default.contentsOfDirectory(atPath: currentDirectory)
+        } catch { return nil }
+
+        guard let match = contents.sorted().first(where: {
+            $0.hasPrefix(token) && $0 != token
+        }) else { return nil }
+
+        return String(match.dropFirst(token.count))
+    }
+
+    /// currentDirectory에서 마지막 토큰으로 파일명 후보 목록을 반환한다
+    static func cwdFileCandidates(for input: String, currentDirectory: String) -> [String] {
+        let token = extractPathToken(from: input)
+        guard token.count >= 2, !token.contains("/"), !token.contains("~") else { return [] }
+
+        let contents: [String]
+        do {
+            contents = try FileManager.default.contentsOfDirectory(atPath: currentDirectory)
+        } catch { return [] }
+
+        let commandPrefix: String
+        if let lastSpaceIndex = input.lastIndex(of: " ") {
+            commandPrefix = String(input[...lastSpaceIndex])
+        } else {
+            commandPrefix = ""
+        }
+
+        return contents.sorted()
+            .filter { $0.hasPrefix(token) && $0 != token }
+            .map { commandPrefix + $0 }
     }
 
     // MARK: - Helpers

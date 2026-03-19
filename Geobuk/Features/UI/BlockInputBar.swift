@@ -9,6 +9,15 @@ struct BlockInputBar: View {
     /// 현재 표시 중인 인라인 완성 힌트 (입력 뒤에 회색으로 표시)
     @State private var completionHint: String? = nil
 
+    /// 완성 후보 목록 (복수 매칭 시 리스트로 표시)
+    @State private var suggestions: [String] = []
+
+    /// 리스트에서 선택된 인덱스 (-1: 선택 없음)
+    @State private var selectedSuggestionIndex: Int = -1
+
+    /// 방향키로 확정된 선택 값 (Enter 시 사용)
+    @State private var confirmedSelection: String? = nil
+
     /// 패널이 포커스되어 있는지 (외부에서 전달)
     var paneFocused: Bool = false
 
@@ -30,8 +39,18 @@ struct BlockInputBar: View {
     /// Ctrl+C 전송 콜백 (인터럽트)
     let onInterrupt: () -> Void
 
+    /// suggestion 리스트가 보이는지 여부
+    private var showSuggestionList: Bool {
+        suggestions.count > 1
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // 완성 후보 리스트 (입력 위에 표시)
+            if showSuggestionList {
+                suggestionListView
+            }
+
             // 컨텍스트 라인: 사용자, 축약 경로
             contextLine
 
@@ -47,6 +66,99 @@ struct BlockInputBar: View {
     }
 
     // MARK: - Subviews
+
+    private var suggestionListView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            let maxVisible = min(suggestions.count, 8)
+            ForEach(0..<maxVisible, id: \.self) { index in
+                HStack(spacing: 6) {
+                    // 파일/디렉토리 아이콘
+                    Image(systemName: suggestionIcon(for: suggestions[index]))
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .frame(width: 14)
+
+                    // 완성 텍스트 (입력 부분 강조)
+                    suggestionText(for: suggestions[index])
+
+                    Spacer()
+
+                    // 선택된 항목에 Tab 힌트
+                    if index == selectedSuggestionIndex {
+                        Text("Tab")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.secondary.opacity(0.15))
+                            .cornerRadius(3)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 3)
+                .background(
+                    index == selectedSuggestionIndex
+                        ? Color.accentColor.opacity(0.2)
+                        : Color.clear
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    applySuggestion(at: index)
+                }
+            }
+
+            if suggestions.count > 8 {
+                Text("  \(suggestions.count - 8) more…")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.secondary.opacity(0.5))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 2)
+            }
+        }
+        .padding(.vertical, 4)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.8))
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+    }
+
+    /// suggestion 항목의 아이콘을 결정한다
+    private func suggestionIcon(for text: String) -> String {
+        // 경로가 포함된 경우 (파일/디렉토리)
+        if text.contains("/") || text.contains("~") {
+            return "folder"
+        }
+        // 히스토리 (이전에 실행한 명령어)
+        if commandHistory.commands.contains(text) {
+            return "clock.arrow.circlepath"
+        }
+        // 공통 명령어
+        return "terminal"
+    }
+
+    /// suggestion 텍스트에서 입력 부분과 완성 부분을 다르게 표시한다
+    private func suggestionText(for text: String) -> some View {
+        let input = persistentText
+        if text.hasPrefix(input) {
+            let remainder = String(text.dropFirst(input.count))
+            return HStack(spacing: 0) {
+                Text(input)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(.secondary.opacity(0.6))
+                Text(remainder)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(.primary)
+            }
+        } else {
+            return HStack(spacing: 0) {
+                Text(text)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(.primary)
+                Text("")
+                    .font(.system(size: 12, design: .monospaced))
+            }
+        }
+    }
 
     private var contextLine: some View {
         HStack(spacing: 6) {
@@ -78,8 +190,8 @@ struct BlockInputBar: View {
                 .foregroundColor(.secondary)
 
             ZStack(alignment: .leading) {
-                // 힌트 텍스트 (회색, 입력 뒤에 표시)
-                if let hint = completionHint, !hint.isEmpty {
+                // 힌트 텍스트 (회색, 입력 뒤에 표시) — 후보가 1개일 때만 인라인 힌트
+                if !showSuggestionList, let hint = completionHint, !hint.isEmpty {
                     Text(persistentText + hint)
                         .font(.system(size: 13, design: .monospaced))
                         .foregroundColor(.secondary.opacity(0.4))
@@ -91,7 +203,7 @@ struct BlockInputBar: View {
                     get: { persistentText },
                     set: { newValue in
                         persistentText = newValue
-                        updateCompletionHint(for: newValue)
+                        updateCompletions(for: newValue)
                     }
                 ))
                     .textFieldStyle(.plain)
@@ -99,6 +211,11 @@ struct BlockInputBar: View {
                     .focused($isInputFocused)
                     .onSubmit { submitCommand() }
                     .onKeyPress(.tab) {
+                        if showSuggestionList {
+                            let idx = selectedSuggestionIndex >= 0 ? selectedSuggestionIndex : 0
+                            applySuggestion(at: idx)
+                            return .handled
+                        }
                         if acceptCompletionHint() { return .handled }
                         handleTab()
                         return .handled
@@ -108,14 +225,26 @@ struct BlockInputBar: View {
                         return .ignored
                     }
                     .onKeyPress(.upArrow) {
+                        if showSuggestionList {
+                            navigateSuggestion(direction: -1)
+                            return .handled
+                        }
                         handleUpArrow()
                         return .handled
                     }
                     .onKeyPress(.downArrow) {
+                        if showSuggestionList {
+                            navigateSuggestion(direction: 1)
+                            return .handled
+                        }
                         handleDownArrow()
                         return .handled
                     }
                     .onKeyPress(.escape) {
+                        if showSuggestionList {
+                            dismissSuggestions()
+                            return .handled
+                        }
                         handleEscape()
                         return .handled
                     }
@@ -135,10 +264,21 @@ struct BlockInputBar: View {
     // MARK: - Actions
 
     private func submitCommand() {
+        // suggestion 리스트에서 방향키로 선택 후 Enter
+        if let selected = confirmedSelection {
+            confirmedSelection = nil
+            persistentText = selected
+            dismissSuggestions()
+            commandHistory.add(selected)
+            onSubmit(selected)
+            persistentText = ""
+            return
+        }
+
         let command = persistentText
         guard !command.isEmpty else { return }
 
-        completionHint = nil
+        dismissSuggestions()
         commandHistory.add(command)
         onSubmit(command)
         persistentText = ""
@@ -150,19 +290,19 @@ struct BlockInputBar: View {
             onSubmit(persistentText)
             persistentText = ""
         }
-        completionHint = nil
+        dismissSuggestions()
         onTab()
     }
 
     private func handleUpArrow() {
-        completionHint = nil
+        dismissSuggestions()
         if let previous = commandHistory.navigateUp() {
             persistentText = previous
         }
     }
 
     private func handleDownArrow() {
-        completionHint = nil
+        dismissSuggestions()
         if let next = commandHistory.navigateDown() {
             persistentText = next
         } else {
@@ -171,26 +311,39 @@ struct BlockInputBar: View {
     }
 
     private func handleEscape() {
-        completionHint = nil
+        dismissSuggestions()
         persistentText = ""
         commandHistory.resetNavigation()
     }
 
     private func handleInterrupt() {
-        completionHint = nil
+        dismissSuggestions()
         persistentText = ""
         onInterrupt()
     }
 
-    // MARK: - Completion
+    // MARK: - Completion & Suggestions
 
-    /// 입력 변경 시 완성 힌트를 갱신한다
-    private func updateCompletionHint(for text: String) {
+    /// 입력 변경 시 완성 힌트와 후보 목록을 갱신한다
+    private func updateCompletions(for text: String) {
+        // 인라인 힌트 (기존)
         completionHint = CompletionProvider.suggest(
             for: text,
             currentDirectory: currentDirectory,
             history: commandHistory
         )
+
+        // 복수 후보 목록
+        let candidates = CompletionProvider.suggestAll(
+            for: text,
+            currentDirectory: currentDirectory,
+            history: commandHistory
+        )
+        // 후보가 바뀌었을 때만 인덱스 리셋 (방향키로 선택 중인 상태 유지)
+        if candidates != suggestions {
+            suggestions = candidates
+            selectedSuggestionIndex = candidates.isEmpty ? -1 : 0
+        }
     }
 
     /// 현재 힌트가 있으면 수락하여 입력에 적용한다
@@ -199,7 +352,30 @@ struct BlockInputBar: View {
     private func acceptCompletionHint() -> Bool {
         guard let hint = completionHint, !hint.isEmpty else { return false }
         persistentText = persistentText + hint
-        completionHint = nil
+        dismissSuggestions()
         return true
+    }
+
+    /// suggestion 리스트 내에서 선택을 이동한다
+    private func navigateSuggestion(direction: Int) {
+        let count = min(suggestions.count, 8)
+        guard count > 0 else { return }
+        selectedSuggestionIndex = (selectedSuggestionIndex + direction + count) % count
+        confirmedSelection = suggestions[selectedSuggestionIndex]
+    }
+
+    /// 선택된 suggestion을 입력에 적용한다
+    private func applySuggestion(at index: Int) {
+        guard index >= 0, index < suggestions.count else { return }
+        persistentText = suggestions[index]
+        dismissSuggestions()
+    }
+
+    /// suggestion 목록과 인라인 힌트를 모두 닫는다
+    private func dismissSuggestions() {
+        completionHint = nil
+        suggestions = []
+        selectedSuggestionIndex = -1
+        confirmedSelection = nil
     }
 }
