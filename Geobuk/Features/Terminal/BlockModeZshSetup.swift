@@ -45,10 +45,10 @@ final class BlockModeZshSetup {
 
         # 최소 프롬프트 강제 (precmd 맨 앞)
         _geobuk_force_prompt() {
-            PS1='$ '
+            PS1=''
             RPS1=''
             RPROMPT=''
-            PROMPT='$ '
+            PROMPT=''
         }
         precmd_functions=(_geobuk_force_prompt "${precmd_functions[@]}")
 
