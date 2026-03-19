@@ -42,9 +42,6 @@ _geobuk_preexec() {
     local cmd="${1//\"/\\\"}"
     _geobuk_send '{"jsonrpc":"2.0","method":"shell.reportState","params":{"surfaceId":"'"$GEOBUK_SURFACE_ID"'","state":"running","command":"'"$cmd"'"}}'
 
-    # 디버그: preexec 호출 확인
-    echo "preexec:$1" >> /tmp/geobuk-preexec-debug
-
     # 블록 구분: 명령어 헤더
     _GEOBUK_CMD_RUNNING=1
     local w=$(_geobuk_cols)
@@ -59,13 +56,15 @@ _geobuk_preexec() {
 
 # JSON-RPC 메시지를 Geobuk 소켓으로 전송 (fire-and-forget)
 # 소켓 전송 실패해도 셸 동작에 영향 없음
+# 모든 출력(stdout/stderr/job notifications)을 완전 억제
 _geobuk_send() {
-    if command -v socat &>/dev/null; then
-        echo "$1" | socat - UNIX-CONNECT:"$GEOBUK_SOCKET_PATH" 2>/dev/null &
-    else
-        echo "$1" | nc -U -w 1 "$GEOBUK_SOCKET_PATH" 2>/dev/null &
-    fi
-    disown 2>/dev/null
+    {
+        if command -v socat &>/dev/null; then
+            echo "$1" | socat - UNIX-CONNECT:"$GEOBUK_SOCKET_PATH" 2>/dev/null
+        else
+            echo "$1" | nc -U -w 1 "$GEOBUK_SOCKET_PATH" 2>/dev/null
+        fi
+    } &>/dev/null &!
 }
 
 # SIGWINCH 핸들러: 리사이즈 시 reflow 아티팩트 완화
@@ -105,5 +104,3 @@ preexec_functions+=(_geobuk_preexec)
 # 최초 로드 시 TTY 보고
 _geobuk_report_tty
 
-# 디버그: 통합 스크립트 로드 확인
-touch /tmp/geobuk-integration-loaded
