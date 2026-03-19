@@ -204,7 +204,10 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
 
     // MARK: - View Lifecycle
 
-    override var acceptsFirstResponder: Bool { true }
+    /// 블록 입력 모드일 때 터미널 직접 입력 비활성화
+    var blockInputMode: Bool = false
+
+    override var acceptsFirstResponder: Bool { !blockInputMode }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()

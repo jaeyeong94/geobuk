@@ -64,6 +64,7 @@ struct SplitPaneView: View {
                             TerminalSurfaceRepresentable(
                                 surfaceView: surfaceView
                             )
+                            .onAppear { surfaceView.blockInputMode = true }
 
                             // 셸 초기화 완료 전까지 오버레이
                             if showInitOverlay {
