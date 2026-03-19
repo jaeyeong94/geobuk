@@ -81,6 +81,13 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
             envVars.append(ghostty_env_var_s(key: cKey, value: cValue))
         }
 
+        // 셸 통합 스크립트 자동 소싱 (initial_input으로 투명하게 주입)
+        // 셸 시작 직후 source 명령을 보내고 clear로 화면 정리
+        let sourceCmd = "[[ -n \"$GEOBUK_SHELL_INTEGRATION\" ]] && source \"$GEOBUK_SHELL_INTEGRATION\" 2>/dev/null; clear\r"
+        let cSourceCmd = strdup(sourceCmd)!
+        cKeys.append(cSourceCmd) // free 목록에 추가
+        surfaceConfig.initial_input = UnsafePointer(cSourceCmd)
+
         envVars.withUnsafeMutableBufferPointer { buffer in
             surfaceConfig.env_vars = buffer.baseAddress
             surfaceConfig.env_var_count = buffer.count
