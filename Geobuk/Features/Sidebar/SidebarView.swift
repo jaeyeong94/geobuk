@@ -7,6 +7,7 @@ struct SidebarView: View {
     var claudeFileWatcher: ClaudeSessionFileWatcher?
     var processMonitor: PaneProcessMonitor?
     var shellStateManager: ShellStateManager?
+    var systemMonitor: SystemMonitor?
     var surfaceViews: [UUID: GhosttySurfaceView] = [:]
     var onWorkspaceSwitch: (() -> Void)?
     var onCreateWorkspace: (() -> Void)?
@@ -121,7 +122,13 @@ struct SidebarView: View {
                 if let watcher = claudeFileWatcher, !watcher.activeSessions.isEmpty {
                     Divider()
                     fileWatcherSection(watcher: watcher)
-                        .padding(.bottom, 16)
+                }
+
+                // 시스템 상태 섹션
+                if let systemMonitor {
+                    Divider()
+                    systemStatusSection(monitor: systemMonitor)
+                        .padding(.bottom, 8)
                 }
             }
         }
@@ -433,6 +440,73 @@ struct SidebarView: View {
                 .padding(.horizontal, 8)
                 .padding(.bottom, 6)
             }
+        }
+    }
+
+    // MARK: - System Status Section
+
+    @ViewBuilder
+    private func systemStatusSection(monitor: SystemMonitor) -> some View {
+        VStack(spacing: 2) {
+            HStack {
+                Text("System")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+
+            HStack(spacing: 8) {
+                Text(String(format: "CPU: %d%%", Int(monitor.cpuUsage * 100)))
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.secondary)
+
+                Text(String(format: "MEM: %d%%", memoryPercent(monitor: monitor)))
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.secondary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+
+            HStack(spacing: 4) {
+                Text("↓")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundColor(.green)
+                Text(formatBytes(monitor.networkBytesIn))
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.secondary)
+
+                Text("↑")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundColor(.blue)
+                Text(formatBytes(monitor.networkBytesOut))
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.secondary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 4)
+        }
+    }
+
+    private func memoryPercent(monitor: SystemMonitor) -> Int {
+        guard monitor.memoryTotal > 0 else { return 0 }
+        return Int(Double(monitor.memoryUsed) / Double(monitor.memoryTotal) * 100)
+    }
+
+    private func formatBytes(_ bytesPerSec: UInt64) -> String {
+        if bytesPerSec >= 1_048_576 {
+            return String(format: "%.1f MB/s", Double(bytesPerSec) / 1_048_576)
+        } else if bytesPerSec >= 1024 {
+            return String(format: "%.0f KB/s", Double(bytesPerSec) / 1024)
+        } else {
+            return "\(bytesPerSec) B/s"
         }
     }
 }

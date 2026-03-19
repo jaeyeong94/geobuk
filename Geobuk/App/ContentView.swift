@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var lineHeight: Double = 1.0
     @State private var fontFamily: String = ""
     @State private var processMonitor = PaneProcessMonitor()
+    @State private var systemMonitor = SystemMonitor()
     @State private var claudeLaunchSettings = ClaudeLaunchSettings()
     @State private var pricingManager = ClaudePricingManager()
     @State private var shellStateManager = ShellStateManager()
@@ -86,6 +87,7 @@ struct ContentView: View {
             .onDisappear {
                 autoSaveTimer?.invalidate()
                 processMonitor.stopMonitoring()
+                systemMonitor.stopMonitoring()
                 claudeMonitor.stopAll()
                 claudeFileWatcher.stopWatching()
                 SessionPersistence.save(manager: workspaceManager)
@@ -111,6 +113,7 @@ struct ContentView: View {
                             claudeFileWatcher: claudeFileWatcher,
                             processMonitor: processMonitor,
                             shellStateManager: shellStateManager,
+                            systemMonitor: systemMonitor,
                             surfaceViews: surfaceViews,
                             onWorkspaceSwitch: { ensureSurfaceForActiveWorkspace() },
                             onCreateWorkspace: { createNewWorkspace() },
@@ -266,6 +269,9 @@ struct ContentView: View {
 
             // 프로세스 모니터 시작
             processMonitor.startMonitoring()
+
+            // 시스템 모니터 시작
+            systemMonitor.startMonitoring()
 
             // Claude 가격 fetch + 모니터/설정 연결
             claudeMonitor.pricingManager = pricingManager

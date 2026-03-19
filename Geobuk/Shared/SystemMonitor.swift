@@ -236,28 +236,45 @@ final class SystemMonitor {
         topProcessesByMemory = Array(stats.sorted { $0.memoryMB > $1.memoryMB }.prefix(10))
     }
 
-    /// ps로 프로세스 목록과 CPU/메모리를 읽는다 (nonisolated — 백그라운드 태스크에서 호출 가능)
+    /// proc_listallpids + proc_pidinfo로 프로세스 목록과 메모리를 읽는다
+    /// subprocess 없이 native Darwin API를 사용한다
     nonisolated static func fetchProcessStats() -> [ProcessStat] {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-eo", "pid,pcpu,rss,comm"]
+        let estimatedCount = proc_listallpids(nil, 0)
+        guard estimatedCount > 0 else { return [] }
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
+        let bufferSize = Int(estimatedCount) * 2
+        var pids = [pid_t](repeating: 0, count: bufferSize)
+        let actualBytes = proc_listallpids(&pids, Int32(bufferSize * MemoryLayout<pid_t>.size))
+        guard actualBytes > 0 else { return [] }
 
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            return []
+        let actualCount = Int(actualBytes) / MemoryLayout<pid_t>.size
+        var stats: [ProcessStat] = []
+        stats.reserveCapacity(actualCount)
+
+        for i in 0..<actualCount {
+            let pid = pids[i]
+            guard pid > 0 else { continue }
+
+            var taskInfo = proc_taskallinfo()
+            let taskInfoSize = Int32(MemoryLayout<proc_taskallinfo>.size)
+            let ret = proc_pidinfo(pid, PROC_PIDTASKALLINFO, 0, &taskInfo, taskInfoSize)
+            guard ret > 0 else { continue }
+
+            // 메모리: resident size (bytes → MB)
+            let memoryMB = taskInfo.ptinfo.pti_resident_size / (1024 * 1024)
+
+            // CPU: total_user + total_system (나노초) — 누적값 기반 상대 순위
+            let cpuNano = taskInfo.ptinfo.pti_total_user + taskInfo.ptinfo.pti_total_system
+            let cpuScore = Double(cpuNano) / 1e9
+
+            var nameBuffer = [CChar](repeating: 0, count: 4096)
+            let nameLen = proc_name(pid, &nameBuffer, UInt32(nameBuffer.count))
+            let name = nameLen > 0 ? String(cString: nameBuffer) : "unknown"
+
+            stats.append(ProcessStat(pid: pid, name: name, cpuPercent: cpuScore, memoryMB: memoryMB))
         }
 
-        guard process.terminationStatus == 0 else { return [] }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { return [] }
-
-        return parsePsOutput(output)
+        return stats
     }
 
     nonisolated static func parsePsOutput(_ output: String) -> [ProcessStat] {
