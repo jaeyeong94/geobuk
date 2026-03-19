@@ -6,6 +6,7 @@ struct TerminalSettingsView: View {
     @Binding var paddingX: Double
     @Binding var paddingY: Double
     @Binding var lineHeight: Double
+    @Binding var fontFamily: String
     @Bindable var claudeSettings: ClaudeLaunchSettings
 
     var onFontSizeChange: (Double) -> Void
@@ -16,6 +17,20 @@ struct TerminalSettingsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Terminal Settings")
                     .font(.headline)
+
+                // 폰트 패밀리
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Font Family")
+                        .font(.system(size: 12))
+                    TextField("e.g. JetBrains Mono, D2Coding", text: $fontFamily)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 11))
+                        .onSubmit { onConfigChanged() }
+
+                    Text("빈칸 = Ghostty 기본 폰트. 여러 폰트는 쉼표로 구분 (영문, 한글)")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                }
 
                 // 폰트 크기: binding action으로 즉시 반영
                 VStack(alignment: .leading, spacing: 4) {

@@ -48,34 +48,33 @@ final class ClaudeLaunchSettings {
     /// 선택 가능한 모델 목록 (가격 매니저에서 동적으로 로드, fallback 하드코딩)
     var availableModels: [ModelOption] {
         if let pm = pricingManager, !pm.pricing.isEmpty {
-            return pm.pricing.values
-                .sorted { $0.outputPerMTok > $1.outputPerMTok } // 비싼 순
-                .map { ModelOption(id: modelNameToAlias($0.modelName), label: "\($0.modelName) ($\(Int($0.inputPerMTok))/$\(Int($0.outputPerMTok)))") }
+            // 최신 모델 우선 (버전 번호 역순), 같으면 비싼 순
+            return pm.pricing
+                .sorted { $0.key > $1.key }
+                .map { ModelOption(
+                    id: $0.key,  // claude-opus-4-6 등 실제 API ID
+                    label: "\($0.value.modelName) ($\(formatPrice($0.value.inputPerMTok))/$\(formatPrice($0.value.outputPerMTok)))"
+                )}
         }
         return Self.defaultModels
     }
 
     /// 기본 모델 목록 (fallback)
     static let defaultModels: [ModelOption] = [
-        ModelOption(id: "opus", label: "Opus ($5/$25)"),
-        ModelOption(id: "sonnet", label: "Sonnet ($3/$15)"),
-        ModelOption(id: "haiku", label: "Haiku ($1/$5)"),
+        ModelOption(id: "opus", label: "Claude Opus ($5/$25)"),
+        ModelOption(id: "sonnet", label: "Claude Sonnet ($3/$15)"),
+        ModelOption(id: "haiku", label: "Claude Haiku ($1/$5)"),
     ]
+
+    private func formatPrice(_ price: Double) -> String {
+        price == Double(Int(price)) ? "\(Int(price))" : String(format: "%.2f", price)
+    }
 
     /// 선택 가능한 effort 목록
     static let availableEfforts = ["low", "medium", "high", "max"]
 
     /// 선택 가능한 권한 모드 목록
     static let availablePermissionModes = ["default", "acceptEdits", "bypassPermissions", "plan", "auto"]
-
-    /// 모델 이름 → alias 변환 (Claude Sonnet 4.6 → sonnet)
-    private func modelNameToAlias(_ name: String) -> String {
-        let lower = name.lowercased()
-        if lower.contains("opus") { return "opus" }
-        if lower.contains("sonnet") { return "sonnet" }
-        if lower.contains("haiku") { return "haiku" }
-        return lower.replacingOccurrences(of: "claude ", with: "").replacingOccurrences(of: " ", with: "-")
-    }
 
     // MARK: - 커맨드 빌드
 

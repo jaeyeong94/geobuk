@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var paddingX: Double = 8
     @State private var paddingY: Double = 4
     @State private var lineHeight: Double = 1.0
+    @State private var fontFamily: String = ""
     @State private var processMonitor = PaneProcessMonitor()
     @State private var claudeLaunchSettings = ClaudeLaunchSettings()
     @State private var pricingManager = ClaudePricingManager()
@@ -65,6 +66,7 @@ struct ContentView: View {
                     paddingX: $paddingX,
                     paddingY: $paddingY,
                     lineHeight: $lineHeight,
+                    fontFamily: $fontFamily,
                     claudeSettings: claudeLaunchSettings,
                     onFontSizeChange: { newSize in
                         setFontSizeForAllSurfaces(newSize)
@@ -74,7 +76,8 @@ struct ContentView: View {
                             fontSize: fontSize,
                             paddingX: paddingX,
                             paddingY: paddingY,
-                            lineHeight: lineHeight
+                            lineHeight: lineHeight,
+                            fontFamily: fontFamily
                         )
                     }
                 )

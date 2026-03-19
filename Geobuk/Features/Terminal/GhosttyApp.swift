@@ -208,7 +208,7 @@ final class GhosttyApp {
     // MARK: - 동적 설정 변경
 
     /// 설정을 동적으로 변경 (슬라이더 등에서 호출)
-    func updateSettings(fontSize: Double, paddingX: Double, paddingY: Double, lineHeight: Double) {
+    func updateSettings(fontSize: Double, paddingX: Double, paddingY: Double, lineHeight: Double, fontFamily: String = "") {
         guard let app else { return }
 
         guard let newConfig = ghostty_config_new() else { return }
@@ -222,12 +222,16 @@ final class GhosttyApp {
         }
 
         // 사용자 설정 오버라이드를 문자열로 적용
-        let overrides = [
+        var overrides = [
             "font-size=\(Int(fontSize))",
             "window-padding-x=\(Int(paddingX))",
             "window-padding-y=\(Int(paddingY))",
             "adjust-cell-height=\(Int((lineHeight - 1.0) * 100))%",
         ]
+
+        if !fontFamily.isEmpty {
+            overrides.append("font-family=\(fontFamily)")
+        }
 
         for override in overrides {
             // ghostty_config_load_file은 파일 경로만 받으므로 임시 파일 사용
