@@ -78,30 +78,47 @@ final class ClaudePricingManager {
         }
     }
 
-    /// HTML에서 가격 테이블 파싱
+    /// HTML에서 가격 테이블 파싱 (서버사이드 렌더링된 <tr><td> 테이블)
     private func parsePricingFromHTML(_ html: String) -> [String: ModelPricing] {
         var result: [String: ModelPricing] = [:]
 
-        // 테이블 행 패턴: | Model | Input | ... | Output |
-        // 간단한 정규식으로 파싱
-        let lines = html.components(separatedBy: "\n")
-        for line in lines {
-            let cells = line.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }
-            guard cells.count >= 6 else { continue }
+        // <tr> 단위로 분리
+        let rowPattern = try? NSRegularExpression(pattern: "<tr[^>]*>(.*?)</tr>", options: .dotMatchesLineSeparators)
+        let cellPattern = try? NSRegularExpression(pattern: "<td[^>]*>(.*?)</td>", options: .dotMatchesLineSeparators)
 
-            let modelName = cells[1]
-                .replacingOccurrences(of: "[deprecated]", with: "")
-                .replacingOccurrences(of: "(.*)", with: "", options: .regularExpression)
-                .trimmingCharacters(in: .whitespaces)
+        guard let rowPattern, let cellPattern else { return result }
 
-            guard modelName.hasPrefix("Claude") else { continue }
-            guard let inputPrice = extractPrice(cells[2]),
-                  let outputPrice = extractPrice(cells[cells.count - 2].isEmpty ? cells[cells.count - 1] : cells[cells.count - 2]) else {
-                continue
+        let range = NSRange(html.startIndex..., in: html)
+        let rowMatches = rowPattern.matches(in: html, range: range)
+
+        for rowMatch in rowMatches {
+            guard let rowRange = Range(rowMatch.range(at: 1), in: html) else { continue }
+            let rowContent = String(html[rowRange])
+
+            // 셀 추출
+            let cellRange = NSRange(rowContent.startIndex..., in: rowContent)
+            let cellMatches = cellPattern.matches(in: rowContent, range: cellRange)
+
+            let cells: [String] = cellMatches.compactMap { match in
+                guard let r = Range(match.range(at: 1), in: rowContent) else { return nil }
+                return String(rowContent[r])
+                    .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespaces)
             }
 
-            let cacheWrite = extractPrice(cells[3]) ?? inputPrice * 1.25
-            let cacheRead = extractPrice(cells[5]) ?? inputPrice * 0.1
+            // 가격 테이블: [Model, Base Input, 5m Cache Write, 1h Cache Write, Cache Hit, Output]
+            guard cells.count >= 6 else { continue }
+
+            let modelName = cells[0]
+                .replacingOccurrences(of: "(deprecated)", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            guard modelName.hasPrefix("Claude") else { continue }
+
+            guard let inputPrice = extractPrice(cells[1]),
+                  let outputPrice = extractPrice(cells[5]) else { continue }
+
+            let cacheWrite = extractPrice(cells[2]) ?? inputPrice * 1.25
+            let cacheRead = extractPrice(cells[4]) ?? inputPrice * 0.1
 
             let modelId = modelNameToId(modelName)
             result[modelId] = ModelPricing(
