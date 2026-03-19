@@ -85,11 +85,7 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
             envVars.append(ghostty_env_var_s(key: cKey, value: cValue))
         }
 
-        // 셸 시작 후 화면 정리 (ZDOTDIR의 .zshrc에서 셸 통합이 로드됨)
-        let sourceCmd = "clear\r"
-        let cSourceCmd = strdup(sourceCmd)!
-        cKeys.append(cSourceCmd)
-        surfaceConfig.initial_input = UnsafePointer(cSourceCmd)
+        // initial_input 불필요 — ZDOTDIR의 .zshrc에서 clear + 배너 출력
 
         envVars.withUnsafeMutableBufferPointer { buffer in
             surfaceConfig.env_vars = buffer.baseAddress
@@ -164,11 +160,7 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
             envVars.append(ghostty_env_var_s(key: cKey, value: cValue))
         }
 
-        // 셸 시작 후 화면 정리 (ZDOTDIR의 .zshrc에서 셸 통합이 로드됨)
-        let sourceCmd = "clear\r"
-        let cSourceCmd = strdup(sourceCmd)!
-        cKeys.append(cSourceCmd)
-        surfaceConfig.initial_input = UnsafePointer(cSourceCmd)
+        // initial_input 불필요 — ZDOTDIR의 .zshrc에서 clear + 배너 출력
 
         // 기존 surface의 작업 디렉토리 상속
         let inheritedCwd = existingSurface.currentDirectory

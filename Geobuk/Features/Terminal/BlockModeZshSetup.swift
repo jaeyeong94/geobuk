@@ -52,6 +52,9 @@ final class BlockModeZshSetup {
         }
         precmd_functions=(_geobuk_force_prompt "${precmd_functions[@]}")
 
+        # 화면 정리 (initial_input 대신 여기서 실행)
+        clear
+
         # 커서 숨김 (DECTCEM: \e[?25l)
         # 블록 입력 모드에서는 하단 입력창이 커서 역할
         printf '\e[?25l'
