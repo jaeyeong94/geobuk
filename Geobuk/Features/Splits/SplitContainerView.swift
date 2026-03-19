@@ -74,15 +74,19 @@ struct SplitPaneView: View {
                                 if !isCommandRunning { surfaceView.blockInputMode = true }
                             }
 
-                            // 블록 모드: 셸 영역 클릭 시 입력창에 포커스
-                            if !isCommandRunning {
-                                Color.clear
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        onTap()
+                            // 셸 영역 클릭 처리
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    onTap()
+                                    if isCommandRunning {
+                                        // 인터렉티브 모드: 터미널에 포커스 복원 (앱 전환 후 복귀 대응)
+                                        surfaceView.window?.makeFirstResponder(surfaceView)
+                                    } else {
+                                        // 블록 모드: 입력창에 포커스
                                         inputFocusTrigger.toggle()
                                     }
-                            }
+                                }
 
                             // 셸 초기화 완료 전까지 오버레이
                             if showInitOverlay {

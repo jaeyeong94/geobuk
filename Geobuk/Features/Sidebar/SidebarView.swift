@@ -325,7 +325,7 @@ struct SidebarView: View {
                     .truncationMode(.middle)
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .contentShape(Rectangle())
         .onTapGesture {
