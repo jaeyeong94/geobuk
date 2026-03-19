@@ -40,11 +40,12 @@ struct BlockInputBar: View {
         )
         .padding(.horizontal, 8)
         .padding(.bottom, 8)
-        .onChange(of: paneFocused) { _, focused in
-            if focused { isInputFocused = true }
-        }
-        .onAppear {
-            if paneFocused { isInputFocused = true }
+        .task(id: paneFocused) {
+            if paneFocused {
+                // 약간의 지연 후 포커스 (뷰 계층 안정화 대기)
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                isInputFocused = true
+            }
         }
     }
 
