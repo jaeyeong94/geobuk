@@ -22,14 +22,21 @@ struct TerminalSettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Font Family")
                         .font(.system(size: 12))
-                    TextField("e.g. JetBrains Mono, D2Coding", text: $fontFamily)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11))
-                        .onSubmit { onConfigChanged() }
 
-                    Text("빈칸 = Ghostty 기본 폰트. 여러 폰트는 쉼표로 구분 (영문, 한글)")
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
+                    Picker("", selection: $fontFamily) {
+                        Text("System Default").tag("")
+                        Divider()
+                        ForEach(Self.monospacefonts, id: \.self) { font in
+                            Text(font)
+                                .font(.custom(font, size: 12))
+                                .tag(font)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity)
+                    .onChange(of: fontFamily) { _, _ in
+                        onConfigChanged()
+                    }
                 }
 
                 // 폰트 크기: binding action으로 즉시 반영
@@ -111,6 +118,7 @@ struct TerminalSettingsView: View {
         paddingX = Defaults.paddingX
         paddingY = Defaults.paddingY
         lineHeight = Defaults.lineHeight
+        fontFamily = ""
         onFontSizeChange(fontSize)
         onConfigChanged()
     }
@@ -121,6 +129,24 @@ struct TerminalSettingsView: View {
         static let paddingY: Double = 4
         static let lineHeight: Double = 1.0
     }
+
+    /// 시스템에 설치된 모노스페이스 폰트 목록
+    static let monospacefonts: [String] = {
+        NSFontManager.shared.availableFontFamilies
+            .filter { family in
+                guard let font = NSFont(name: family, size: 13) else { return false }
+                return font.isFixedPitch
+                    || family.lowercased().contains("mono")
+                    || family.lowercased().contains("code")
+                    || family.lowercased().contains("consol")
+                    || family.lowercased().contains("courier")
+                    || family.lowercased().contains("d2coding")
+                    || family.lowercased().contains("hack")
+                    || family.lowercased().contains("fira")
+                    || family.lowercased().contains("iosevka")
+            }
+            .sorted()
+    }()
 
     @ViewBuilder
     private func settingRow(
