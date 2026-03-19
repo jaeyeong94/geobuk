@@ -27,6 +27,7 @@ struct ContentView: View {
         mainContent
             .frame(minWidth: 600, minHeight: 400)
             .background(Color.black)
+            .navigationTitle(dynamicTitle)
             .task {
                 await initializeTerminal()
             }
@@ -141,6 +142,54 @@ struct ContentView: View {
 
     private var activeManager: SplitTreeManager? {
         workspaceManager.activeWorkspace?.splitManager
+    }
+
+    /// 타이틀바에 표시할 동적 제목
+    private var dynamicTitle: String {
+        guard let workspace = workspaceManager.activeWorkspace else { return "Geobuk" }
+
+        let focusedSurface: GhosttySurfaceView? = {
+            guard let id = workspace.splitManager.focusedPaneId else { return nil }
+            return surfaceViews[id]
+        }()
+
+        // Claude 실행 중인지 확인
+        if let surface = focusedSurface, surface.isCommandRunning {
+            // Claude 세션 정보가 있으면 표시
+            for session in claudeFileWatcher.activeSessions {
+                if let state = claudeMonitor.getState(for: session.sessionId),
+                   state.phase != .idle {
+                    let model = claudeMonitor.sessionModels[session.sessionId] ?? "claude"
+                    let phase = phaseTextForTitle(state.phase, toolName: state.currentToolName)
+                    var title = "\(model) · \(phase)"
+                    if state.costUSD > 0 {
+                        title += String(format: " · $%.2f", state.costUSD)
+                    }
+                    return title
+                }
+            }
+        }
+
+        // 일반 모드: 셸 정보
+        let dir = focusedSurface?.currentDirectory.map { PathAbbreviator.abbreviate($0) } ?? "~"
+        let paneCount = workspace.splitManager.paneCount
+
+        if paneCount > 1 {
+            return "\(workspace.name) · \(paneCount) panes · \(dir)"
+        }
+        return "zsh \(dir)"
+    }
+
+    private func phaseTextForTitle(_ phase: AISessionPhase, toolName: String?) -> String {
+        switch phase {
+        case .responding: return "Responding..."
+        case .toolExecuting:
+            if let tool = toolName { return "Tool: \(tool)" }
+            return "Executing"
+        case .waitingForInput: return "Waiting for input"
+        case .sessionComplete: return "Complete"
+        default: return "Active"
+        }
     }
 
     // MARK: - Workspace Content View
