@@ -364,10 +364,7 @@ struct SidebarView: View {
     }
 
     private func abbreviatedPath(_ path: String) -> String {
-        let home = NSHomeDirectory()
-        if path == home { return "~" }
-        if path.hasPrefix(home) { return "~" + path.dropFirst(home.count) }
-        return path
+        PathAbbreviator.abbreviate(path)
     }
 
     // MARK: - Claude Session Section
@@ -570,13 +567,7 @@ struct WorkspaceTabView: View {
 
     /// 경로를 축약하여 표시 (홈 디렉토리 -> ~)
     private func abbreviatedPath(_ path: String) -> String {
-        let home = NSHomeDirectory()
-        if path == home {
-            return "~"
-        } else if path.hasPrefix(home) {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
+        PathAbbreviator.abbreviate(path)
     }
 
     /// 비용을 포맷한다 ($0.45 형식)

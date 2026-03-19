@@ -191,10 +191,7 @@ struct PaneRowView: View {
     }
 
     private func abbreviatedPath(_ path: String) -> String {
-        let home = NSHomeDirectory()
-        if path == home { return "~" }
-        if path.hasPrefix(home) { return "~" + path.dropFirst(home.count) }
-        return path
+        PathAbbreviator.abbreviate(path)
     }
 }
 

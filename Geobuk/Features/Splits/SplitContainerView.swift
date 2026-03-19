@@ -59,34 +59,51 @@ struct SplitPaneView: View {
             switch content {
             case .terminal:
                 if let surfaceView = surfaceViewProvider(content.id) {
-                    TerminalSurfaceRepresentable(
-                        surfaceView: surfaceView
-                    )
+                    VStack(spacing: 0) {
+                        ZStack {
+                            TerminalSurfaceRepresentable(
+                                surfaceView: surfaceView
+                            )
 
-                    // 셸 초기화 완료 전까지 오버레이
-                    if showInitOverlay {
-                        Color.black
-                            .overlay {
-                                VStack(spacing: 8) {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                    Text("Initializing shell...")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                }
+                            // 셸 초기화 완료 전까지 오버레이
+                            if showInitOverlay {
+                                Color.black
+                                    .overlay {
+                                        VStack(spacing: 8) {
+                                            ProgressView()
+                                                .controlSize(.small)
+                                            Text("Initializing shell...")
+                                                .font(.system(size: 11))
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .transition(.opacity)
+                                    .task {
+                                        // 셸 준비 대기: currentDirectory가 설정될 때까지 폴링
+                                        // 또는 최대 2초 후 강제 제거
+                                        for _ in 0..<40 {  // 50ms x 40 = 2초
+                                            try? await Task.sleep(nanoseconds: 50_000_000)
+                                            if surfaceView.currentDirectory != nil { break }
+                                        }
+                                        withAnimation(.easeOut(duration: 0.2)) {
+                                            showInitOverlay = false
+                                        }
+                                    }
                             }
-                            .transition(.opacity)
-                            .task {
-                                // 셸 준비 대기: currentDirectory가 설정될 때까지 폴링
-                                // 또는 최대 2초 후 강제 제거
-                                for _ in 0..<40 {  // 50ms x 40 = 2초
-                                    try? await Task.sleep(nanoseconds: 50_000_000)
-                                    if surfaceView.currentDirectory != nil { break }
-                                }
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    showInitOverlay = false
-                                }
+                        }
+
+                        BlockInputBar(
+                            currentDirectory: surfaceView.currentDirectory,
+                            onSubmit: { command in
+                                surfaceView.sendText(command + "\r")
+                            },
+                            onTab: {
+                                surfaceView.sendText("\t")
+                            },
+                            onInterrupt: {
+                                surfaceView.sendText("\u{03}") // Ctrl+C
                             }
+                        )
                     }
                 } else {
                     Color.black
