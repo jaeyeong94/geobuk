@@ -24,6 +24,7 @@ final class ShellStateManager {
     /// TTY 이름을 등록한다
     func reportTty(surfaceId: String, tty: String) {
         ttyNames[surfaceId] = tty
+        GeobukLogger.info(.shell, "TTY reported", context: ["surfaceId": surfaceId, "tty": tty])
     }
 
     /// 셸 상태를 업데이트한다
@@ -33,12 +34,14 @@ final class ShellStateManager {
             command: command,
             updatedAt: Date()
         )
+        GeobukLogger.debug(.shell, "Shell state changed", context: ["surfaceId": surfaceId, "state": state, "command": command ?? ""])
     }
 
     /// Surface 제거 시 관련 데이터를 정리한다
     func removeSurface(surfaceId: String) {
         ttyNames.removeValue(forKey: surfaceId)
         shellStates.removeValue(forKey: surfaceId)
+        GeobukLogger.debug(.shell, "Surface removed", context: ["surfaceId": surfaceId])
     }
 
     /// 사이드바 표시용 프로세스 이름을 반환한다

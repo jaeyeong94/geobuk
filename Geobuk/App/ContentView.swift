@@ -180,11 +180,13 @@ struct ContentView: View {
 
     @MainActor
     private func initializeTerminal() async {
+        GeobukLogger.info(.app, "App initializing")
         do {
             try ghosttyApp.create()
 
             // 세션 복원 시도
             if let state = SessionPersistence.restore() {
+                GeobukLogger.info(.app, "Restoring session", context: ["workspaces": "\(state.workspaces.count)"])
                 restoreFromPersistedState(state)
             }
 
@@ -199,6 +201,7 @@ struct ContentView: View {
             }
 
             isInitialized = true
+            GeobukLogger.info(.app, "App initialized", context: ["workspaces": "\(workspaceManager.workspaces.count)"])
 
             // 초기 패널에 포커스
             if let focusedId = activeManager?.focusedPaneId {
@@ -225,11 +228,13 @@ struct ContentView: View {
             claudeFileWatcher.onSessionEnded = { sessionId in
                 claudeMonitor.removeSession(sessionId)
             }
+            GeobukLogger.info(.claude, "Claude file watcher starting")
             claudeFileWatcher.startWatching()
 
             // 자동 저장 타이머 시작 (30초마다)
             startAutoSaveTimer()
         } catch {
+            GeobukLogger.error(.app, "App initialization failed", error: error)
             errorMessage = error.localizedDescription
         }
     }
@@ -275,6 +280,7 @@ struct ContentView: View {
            surfaceViews[newPaneId] == nil {
             let surfaceView = GhosttySurfaceView(app: ghosttyApp)
             surfaceViews[newPaneId] = surfaceView
+            GeobukLogger.info(.workspace, "Pane split", context: ["direction": "\(direction)", "paneId": newPaneId.uuidString])
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 focusSurfaceView(id: newPaneId)
@@ -302,6 +308,7 @@ struct ContentView: View {
         }
 
         if let closingId = splitManager.focusedPaneId {
+            GeobukLogger.info(.workspace, "Pane closing", context: ["paneId": closingId.uuidString])
             splitManager.closeFocusedPane()
 
             if let surfaceView = surfaceViews.removeValue(forKey: closingId) {
@@ -326,6 +333,7 @@ struct ContentView: View {
         // 1. Workspace를 먼저 만들되 아직 active로 전환하지 않음
         let workspace = Workspace(name: workspaceManager.nextWorkspaceName(), cwd: NSHomeDirectory())
         let initialPaneId = workspace.splitManager.focusedPaneId!
+        GeobukLogger.info(.workspace, "Workspace creating", context: ["name": workspace.name])
 
         // 2. Surface를 먼저 생성 (SwiftUI re-render 전에 준비)
         let surfaceView = GhosttySurfaceView(app: ghosttyApp)
@@ -346,6 +354,7 @@ struct ContentView: View {
 
         // 닫을 워크스페이스의 모든 surface 정리
         if let workspace = workspaceManager.activeWorkspace {
+            GeobukLogger.info(.workspace, "Workspace closing", context: ["name": workspace.name, "index": "\(index)"])
             for leaf in workspace.splitManager.root.allLeaves() {
                 if let surfaceView = surfaceViews.removeValue(forKey: leaf.id) {
                     claudeMonitor.stopMonitoring(surfaceViewId: surfaceView.viewId)
@@ -412,7 +421,9 @@ struct ContentView: View {
         do {
             try await server.start()
             AppState.shared.isSocketServerRunning = true
+            GeobukLogger.info(.socket, "Socket server started", context: ["path": SocketServer.defaultSocketPath])
         } catch {
+            GeobukLogger.error(.socket, "Socket server failed to start", error: error)
             // 소켓 서버 실패해도 터미널 기능은 정상
         }
     }

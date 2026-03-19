@@ -46,6 +46,7 @@ final class PaneProcessMonitor {
 
         self.appPid = appPid
         isMonitoring = true
+        GeobukLogger.info(.process, "Process monitoring started", context: ["appPid": "\(appPid)"])
 
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -62,6 +63,7 @@ final class PaneProcessMonitor {
         pollingTask = nil
         isMonitoring = false
         claudeProcesses.removeAll()
+        GeobukLogger.info(.process, "Process monitoring stopped")
     }
 
     /// 포커스된 패널 ID 목록을 업데이트한다 (적응형 폴링용)
@@ -94,6 +96,8 @@ final class PaneProcessMonitor {
 
         var newClaudeProcesses: [UUID: ClaudePaneInfo] = [:]
 
+        GeobukLogger.debug(.process, "Scan cycle", context: ["children": "\(appChildren.count)", "totalProcesses": "\(all.count)"])
+
         // 각 직계 자식의 서브트리에서 Claude 프로세스 탐색
         for child in appChildren {
             if let claudeProc = findClaudeInSubtree(pid: child.pid, allProcesses: all) {
@@ -110,8 +114,15 @@ final class PaneProcessMonitor {
                         processName: claudeProc.name,
                         detectedAt: Date()
                     )
+                    GeobukLogger.info(.process, "Claude process detected", context: ["pid": "\(claudeProc.pid)", "name": claudeProc.name])
                 }
             }
+        }
+
+        // 사라진 Claude 프로세스 감지
+        let lostPids = Set(claudeProcesses.values.map(\.claudePid)).subtracting(newClaudeProcesses.values.map(\.claudePid))
+        for pid in lostPids {
+            GeobukLogger.info(.process, "Claude process lost", context: ["pid": "\(pid)"])
         }
 
         claudeProcesses = newClaudeProcesses

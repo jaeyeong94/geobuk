@@ -53,6 +53,7 @@ final class ClaudeSessionMonitor {
     func startMonitoring() {
         isMonitoring = true
         isStopped = false
+        GeobukLogger.info(.claude, "Monitoring started")
     }
 
     /// surface의 PTY 로그 파일을 통해 모니터링 시작
@@ -103,6 +104,7 @@ final class ClaudeSessionMonitor {
         isStopped = true
         sessionState.reset()
         Task { await parser.reset() }
+        GeobukLogger.info(.claude, "Monitoring stopped")
     }
 
     // MARK: - 데이터 입력
@@ -148,6 +150,8 @@ final class ClaudeSessionMonitor {
         // 단일 상태도 마지막 활성 세션으로 업데이트 (하위 호환)
         let _ = { self.sessionState.processEvent(.sessionInit(sessionId: sid)) }()
 
+        GeobukLogger.debug(.claude, "Event processed", context: ["sessionId": sid, "type": type])
+
         switch type {
         case "user":
             // 사용자가 프롬프트를 제출함 → 응답 대기 (세션 활성화)
@@ -184,6 +188,7 @@ final class ClaudeSessionMonitor {
                let model = message["model"] as? String {
                 detectedModel = model
                 sessionModels[sid] = model
+                GeobukLogger.info(.claude, "Model detected", context: ["sessionId": sid, "model": model])
             }
 
             // 토큰 사용량
@@ -208,6 +213,7 @@ final class ClaudeSessionMonitor {
                         cacheWriteTokens: cacheWrite
                     )
                     state.addCost(cost)
+                    GeobukLogger.debug(.claude, "Cost calculated", context: ["sessionId": sid, "model": model, "cost": String(format: "%.6f", cost), "inputTokens": "\(input)", "outputTokens": "\(output)"])
                 }
             }
 

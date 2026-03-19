@@ -100,6 +100,7 @@ actor SocketServer {
         }
 
         isRunning = true
+        GeobukLogger.info(.socket, "Server started", context: ["path": socketPath])
 
         // accept 루프 시작
         let fd = serverFd
@@ -113,6 +114,7 @@ actor SocketServer {
     func stop() {
         guard isRunning else { return }
         isRunning = false
+        GeobukLogger.info(.socket, "Server stopped")
 
         // accept 루프 취소
         acceptTask?.cancel()
@@ -153,10 +155,12 @@ actor SocketServer {
 
             if clientFd >= 0 {
                 clientFds.insert(clientFd)
+                GeobukLogger.debug(.socket, "Client connected", context: ["fd": "\(clientFd)"])
                 let mgr = sessionManager
                 Task {
                     await self.handleClient(clientFd, sessionManager: mgr)
                     self.clientFds.remove(clientFd)
+                    GeobukLogger.debug(.socket, "Client disconnected", context: ["fd": "\(clientFd)"])
                 }
             } else {
                 // EAGAIN/EWOULDBLOCK - no pending connections
@@ -221,6 +225,7 @@ actor SocketServer {
             let response = await router.route(request)
             return try JSONEncoder().encode(response)
         } catch {
+            GeobukLogger.error(.socket, "Request processing failed", error: error)
             // Parse error
             let errorResponse = JSONRPCResponse.error(
                 code: JSONRPCErrorCode.parseError.rawValue,

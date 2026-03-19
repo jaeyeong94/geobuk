@@ -72,8 +72,12 @@ final class ClaudePricingManager {
                 pricing = parsed
                 lastUpdated = Date()
                 saveCachedPricing()
+                GeobukLogger.info(.claude, "Pricing fetched", context: ["modelCount": "\(parsed.count)"])
+            } else {
+                GeobukLogger.warn(.claude, "Pricing fetch returned no models")
             }
         } catch {
+            GeobukLogger.error(.claude, "Pricing fetch failed", error: error)
             // fetch 실패 시 캐시 또는 기본값 유지
         }
     }
@@ -157,6 +161,7 @@ final class ClaudePricingManager {
         let cache = CachedPricing(pricing: pricing, lastUpdated: lastUpdated ?? Date())
         guard let data = try? JSONEncoder().encode(cache) else { return }
         try? data.write(to: URL(fileURLWithPath: Self.cachePath))
+        GeobukLogger.debug(.claude, "Pricing cache saved", context: ["modelCount": "\(pricing.count)"])
     }
 
     private func loadCachedPricing() {
@@ -164,6 +169,7 @@ final class ClaudePricingManager {
               let cache = try? JSONDecoder().decode(CachedPricing.self, from: data) else { return }
         pricing = cache.pricing
         lastUpdated = cache.lastUpdated
+        GeobukLogger.debug(.claude, "Pricing cache loaded", context: ["modelCount": "\(pricing.count)"])
     }
 
     // MARK: - Default Pricing (fallback)

@@ -106,6 +106,8 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         // C 문자열 해제 (surface 생성 완료 후 안전)
         for ptr in cKeys { free(ptr) }
         for ptr in cValues { free(ptr) }
+
+        GeobukLogger.debug(.terminal, "Surface created", context: ["viewId": viewId.uuidString])
     }
 
     @available(*, unavailable)
@@ -337,6 +339,7 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     /// Surface 리소스 해제
     func close() {
         guard let surface else { return }
+        GeobukLogger.debug(.terminal, "Surface closed", context: ["viewId": viewId.uuidString])
         ghostty_surface_free(surface)
         self.surface = nil
     }

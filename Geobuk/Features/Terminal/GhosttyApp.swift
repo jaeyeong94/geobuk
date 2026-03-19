@@ -35,6 +35,7 @@ final class GhosttyApp {
 
         // 1. Config 생성 및 로드
         guard let cfg = ghostty_config_new() else {
+            GeobukLogger.error(.terminal, "Ghostty config creation failed")
             throw GhosttyError.configCreationFailed
         }
         // 사용자 Ghostty 설정 로드 (~/.config/ghostty/config)
@@ -42,6 +43,7 @@ final class GhosttyApp {
 
         // Geobuk 기본 설정 오버라이드 (cursor-style = bar 등)
         if let configPath = Bundle.main.path(forResource: "geobuk-default", ofType: "conf") {
+            GeobukLogger.info(.config, "Loading config", context: ["path": configPath])
             configPath.withCString { ptr in
                 ghostty_config_load_file(cfg, ptr)
             }
@@ -76,6 +78,7 @@ final class GhosttyApp {
                                 guard ghostty_surface_userdata(surface) != nil else { return }
                                 let surfaceView = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
                                 guard surfaceView.hasSurface else { return }
+                                GeobukLogger.debug(.terminal, "PWD action received", context: ["pwd": pwd])
                                 surfaceView.currentDirectory = pwd
                             }
                         }
@@ -126,9 +129,11 @@ final class GhosttyApp {
         guard let ghosttyApp = ghostty_app_new(&runtimeConfig, cfg) else {
             ghostty_config_free(cfg)
             self.config = nil
+            GeobukLogger.error(.terminal, "Ghostty app creation failed")
             throw GhosttyError.appCreationFailed
         }
         self.app = ghosttyApp
+        GeobukLogger.info(.terminal, "Ghostty initialized successfully")
     }
 
     /// Ghostty 앱 리소스 해제

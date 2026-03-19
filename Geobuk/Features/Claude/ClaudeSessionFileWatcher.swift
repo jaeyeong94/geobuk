@@ -33,6 +33,7 @@ final class ClaudeSessionFileWatcher {
     /// 감시 시작 (2초 간격 폴링)
     func startWatching() {
         stopWatching()
+        GeobukLogger.info(.claude, "Session file watcher started", context: ["dir": sessionsDir])
         scanSessions()
         scanTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -49,6 +50,7 @@ final class ClaudeSessionFileWatcher {
             Task { await tailer.stopTailing() }
         }
         tailers.removeAll()
+        GeobukLogger.info(.claude, "Session file watcher stopped")
     }
 
     // MARK: - Session Scanning
@@ -84,18 +86,25 @@ final class ClaudeSessionFileWatcher {
             let cwd = json["cwd"] as? String ?? ""
             let startedAt = (json["startedAt"] as? Double).map { Date(timeIntervalSince1970: $0 / 1000) }
 
+            let transcriptPath = findTranscriptPath(sessionId: sessionId, cwd: cwd)
             let session = ClaudeFileSession(
                 pid: pid_t(pid),
                 sessionId: sessionId,
                 cwd: cwd,
                 startedAt: startedAt,
-                transcriptPath: findTranscriptPath(sessionId: sessionId, cwd: cwd)
+                transcriptPath: transcriptPath
             )
             foundSessions.append(session)
 
             // 새 세션이면 트랜스크립트 tailing 시작
-            if tailers[sessionId] == nil, let transcriptPath = session.transcriptPath {
-                startTailing(sessionId: sessionId, path: transcriptPath)
+            if tailers[sessionId] == nil {
+                if let tp = transcriptPath {
+                    GeobukLogger.info(.claude, "Session detected", context: ["sessionId": sessionId, "pid": "\(pid)"])
+                    GeobukLogger.debug(.claude, "Transcript found, starting tail", context: ["sessionId": sessionId, "path": tp])
+                    startTailing(sessionId: sessionId, path: tp)
+                } else {
+                    GeobukLogger.warn(.claude, "Transcript not found", context: ["sessionId": sessionId, "cwd": cwd])
+                }
             }
         }
 
@@ -107,7 +116,9 @@ final class ClaudeSessionFileWatcher {
         for sessionId in endedIds {
             if let tailer = tailers.removeValue(forKey: sessionId) {
                 Task { await tailer.stopTailing() }
+                GeobukLogger.debug(.claude, "Tailing stopped", context: ["sessionId": sessionId])
             }
+            GeobukLogger.info(.claude, "Session ended", context: ["sessionId": sessionId])
             onSessionEnded?(sessionId)
         }
 
@@ -146,6 +157,7 @@ final class ClaudeSessionFileWatcher {
     private func startTailing(sessionId: String, path: String) {
         let tailer = PTYLogTailer(filePath: path)
         tailers[sessionId] = tailer
+        GeobukLogger.debug(.claude, "Tailing started", context: ["sessionId": sessionId])
 
         let sid = sessionId
         Task {
