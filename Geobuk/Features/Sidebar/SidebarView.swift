@@ -6,6 +6,7 @@ struct SidebarView: View {
     var claudeMonitor: ClaudeSessionMonitor?
     var claudeFileWatcher: ClaudeSessionFileWatcher?
     var processMonitor: PaneProcessMonitor?
+    var surfaceViews: [UUID: GhosttySurfaceView] = [:]
     var onWorkspaceSwitch: (() -> Void)?
     var onCreateWorkspace: (() -> Void)?
     var onNewClaudeSession: (() -> Void)?
@@ -48,8 +49,18 @@ struct SidebarView: View {
                         let isActive = index == workspaceManager.activeIndex
 
                         VStack(spacing: 0) {
+                            // 포커스 패널의 실제 cwd (없으면 workspace.cwd)
+                            let focusedDir: String = {
+                                if let focusedId = workspace.splitManager.focusedPaneId,
+                                   let dir = surfaceViews[focusedId]?.currentDirectory {
+                                    return dir
+                                }
+                                return workspace.cwd
+                            }()
+
                             WorkspaceTabView(
                                 workspace: workspace,
+                                displayCwd: focusedDir,
                                 index: index,
                                 isActive: isActive,
                                 isEditing: editingIndex == index,
@@ -130,6 +141,10 @@ struct SidebarView: View {
             let claudeInfo = processMonitor?.claudeProcesses.values.first(where: { $0.paneId == pane.id })
             let isClaudeSession = claudeInfo != nil
 
+            // SurfaceView에서 현재 디렉토리 + 프로세스 정보 가져오기
+            let surfaceView = surfaceViews[pane.id]
+            let currentDir = surfaceView?.currentDirectory
+
             // 프로세스명: Claude이면 "claude", 아니면 nil (추후 PTY-PID 매핑으로 확장)
             let processName: String? = isClaudeSession ? (claudeInfo?.processName ?? "claude") : nil
 
@@ -143,6 +158,7 @@ struct SidebarView: View {
                 index: index + 1,
                 isFocused: isFocused,
                 processName: processName,
+                currentDirectory: currentDir,
                 isClaudeSession: isClaudeSession,
                 claudePhase: claudePhase,
                 tokenCount: tokenCount,
@@ -412,6 +428,7 @@ struct SidebarView: View {
 /// 사이드바에서 개별 워크스페이스를 나타내는 탭 뷰
 struct WorkspaceTabView: View {
     let workspace: Workspace
+    var displayCwd: String? = nil
     let index: Int
     let isActive: Bool
     let isEditing: Bool
@@ -464,7 +481,7 @@ struct WorkspaceTabView: View {
 
                         // 활성 워크스페이스: 경로를 같은 줄에 표시
                         if isActive {
-                            Text(abbreviatedPath(workspace.cwd))
+                            Text(abbreviatedPath(displayCwd ?? workspace.cwd))
                                 .font(.system(size: 10))
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
@@ -476,7 +493,7 @@ struct WorkspaceTabView: View {
                 // 비활성 워크스페이스: 상세 정보를 인라인으로 표시
                 if !isActive {
                     // 경로
-                    Text(abbreviatedPath(workspace.cwd))
+                    Text(abbreviatedPath(displayCwd ?? workspace.cwd))
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                         .lineLimit(1)

@@ -8,6 +8,7 @@ struct PaneTreeInfo: Identifiable, Sendable {
     let index: Int
     let isFocused: Bool
     let processName: String?
+    let currentDirectory: String?
     let isClaudeSession: Bool
     let claudePhase: AISessionPhase?
     let tokenCount: Int
@@ -105,6 +106,16 @@ struct PaneRowView: View {
                         .foregroundColor(.secondary.opacity(0.6))
                 }
 
+                // 현재 디렉토리
+                if let dir = pane.currentDirectory {
+                    Text(" ")
+                    Text(abbreviatedPath(dir))
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary.opacity(0.5))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
                 // Claude 상태 인디케이터
                 if pane.isClaudeSession, let statusText = pane.claudeStatusText {
                     Text(" ")
@@ -174,6 +185,13 @@ struct PaneRowView: View {
                 }
             }
         }
+    }
+
+    private func abbreviatedPath(_ path: String) -> String {
+        let home = NSHomeDirectory()
+        if path == home { return "~" }
+        if path.hasPrefix(home) { return "~" + path.dropFirst(home.count) }
+        return path
     }
 }
 

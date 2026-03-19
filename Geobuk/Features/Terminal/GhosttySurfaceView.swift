@@ -18,6 +18,9 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     /// keyDown 중 insertText로부터 누적된 텍스트 (nil = keyDown 밖)
     private var keyTextAccumulator: [String]?
 
+    /// 셸의 현재 작업 디렉토리 (OSC 7 → action_cb PWD로 업데이트)
+    var currentDirectory: String?
+
     /// surface 존재 여부
     var hasSurface: Bool { surface != nil }
 

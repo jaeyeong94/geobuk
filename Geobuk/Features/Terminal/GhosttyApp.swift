@@ -62,7 +62,22 @@ final class GhosttyApp {
             }
         }
         runtimeConfig.action_cb = { app, target, action in
-            // Phase 1: 액션은 로깅만 (탭 생성, 타이틀 변경 등)
+            // PWD 변경 감지 (셸이 cd 할 때 OSC 7로 전달)
+            if action.tag == GHOSTTY_ACTION_PWD {
+                if target.tag == GHOSTTY_TARGET_SURFACE {
+                    let surface = target.target.surface
+                    if let userdata = ghostty_surface_userdata(surface) {
+                        let surfaceView = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
+                        if let pwdStr = action.action.pwd.pwd {
+                            let pwd = String(cString: pwdStr)
+                            DispatchQueue.main.async {
+                                surfaceView.currentDirectory = pwd
+                            }
+                        }
+                    }
+                }
+                return true
+            }
             return false
         }
         runtimeConfig.read_clipboard_cb = { userdata, location, state in

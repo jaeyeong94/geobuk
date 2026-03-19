@@ -31,6 +31,7 @@ struct ContentView: View {
                             claudeMonitor: claudeMonitor,
                             claudeFileWatcher: claudeFileWatcher,
                             processMonitor: processMonitor,
+                            surfaceViews: surfaceViews,
                             onWorkspaceSwitch: { ensureSurfaceForActiveWorkspace() },
                             onCreateWorkspace: { createNewWorkspace() },
                             onNewClaudeSession: { startNewClaudeSession() }
