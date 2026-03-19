@@ -150,6 +150,7 @@ final class ClaudeSessionMonitor {
 
         switch type {
         case "user":
+            // 사용자가 프롬프트를 제출함 → 응답 대기 (세션 활성화)
             state.processEvent(.sessionInit(sessionId: sid))
 
         case "assistant":
@@ -158,6 +159,9 @@ final class ClaudeSessionMonitor {
                 for block in content {
                     if let blockType = block["type"] as? String {
                         switch blockType {
+                        case "thinking":
+                            // 생각 중 → Responding 상태
+                            state.processEvent(.assistantMessage(text: "(thinking...)"))
                         case "text":
                             let text = block["text"] as? String ?? ""
                             state.processEvent(.assistantMessage(text: text))
@@ -221,8 +225,17 @@ final class ClaudeSessionMonitor {
             }
 
         case "system":
-            if let subtype = event["subtype"] as? String, subtype == "turn_duration" {
-                state.processEvent(.result(text: "turn complete"))
+            if let subtype = event["subtype"] as? String {
+                switch subtype {
+                case "turn_duration":
+                    // 턴 완료 → 입력 대기 상태
+                    state.processEvent(.permissionRequest(toolName: ""))
+                case "stop_hook_summary":
+                    // stop hook 실행 완료 → 세션 종료/대기
+                    state.processEvent(.result(text: "complete"))
+                default:
+                    break
+                }
             }
 
         default:

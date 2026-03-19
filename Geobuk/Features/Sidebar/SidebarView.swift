@@ -321,14 +321,15 @@ struct SidebarView: View {
     /// phase를 표시 텍스트로 변환
     private func phaseText(_ phase: AISessionPhase, toolName: String?) -> String {
         switch phase {
-        case .responding: return "Responding"
+        case .responding: return "Responding..."
         case .toolExecuting:
             if let tool = toolName { return "Tool: \(tool)" }
-            return "ToolExecuting"
-        case .waitingForInput: return "Waiting for input"
+            return "Executing tool"
+        case .toolComplete: return "Tool complete"
+        case .waitingForInput: return "⚠ Waiting for input"
         case .sessionActive: return "Active"
         case .sessionComplete: return "Complete"
-        default: return ""
+        case .idle: return "Idle"
         }
     }
 
