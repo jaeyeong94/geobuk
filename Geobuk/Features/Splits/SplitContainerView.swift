@@ -98,7 +98,6 @@ struct SplitPaneView: View {
                             }
                         }
 
-                        if !isCommandRunning {
                         BlockInputBar(
                             paneFocused: isFocused,
                             currentDirectory: surfaceView.currentDirectory,
@@ -138,7 +137,9 @@ struct SplitPaneView: View {
                                 surfaceView.sendKeyPress(keyCode: 8, char: "c", mods: GHOSTTY_MODS_CTRL)
                             }
                         )
-                        } // if !isCommandRunning
+                        .opacity(isCommandRunning ? 0 : 1)
+                        .frame(height: isCommandRunning ? 0 : nil)
+                        .animation(.easeInOut(duration: 0.15), value: isCommandRunning)
                     }
                 } else {
                     Color.black
