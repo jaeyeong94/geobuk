@@ -95,18 +95,21 @@ struct PaneRowView: View {
 
                 Text(" ")
 
-                // 프로세스명
+                // 프로세스명 + 경로
                 if let processName = pane.processName {
                     Text(processName)
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(pane.isClaudeSession ? .green : .secondary)
+                } else if pane.currentDirectory != nil {
+                    Text("zsh")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary)
                 } else {
-                    Text("(idle)")
+                    Text("(starting...)")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary.opacity(0.6))
                 }
 
-                // 현재 디렉토리
                 if let dir = pane.currentDirectory {
                     Text(" ")
                     Text(abbreviatedPath(dir))
