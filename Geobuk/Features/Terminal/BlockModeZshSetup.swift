@@ -52,6 +52,14 @@ final class BlockModeZshSetup {
         }
         precmd_functions=(_geobuk_force_prompt "${precmd_functions[@]}")
 
+        # 커서 숨김 (DECTCEM: \e[?25l)
+        # 블록 입력 모드에서는 하단 입력창이 커서 역할
+        printf '\e[?25l'
+
+        # 명령 실행 후에도 커서 숨김 유지
+        _geobuk_hide_cursor() { printf '\e[?25l'; }
+        precmd_functions+=(_geobuk_hide_cursor)
+
         # Geobuk 셸 통합 로드
         [[ -n "$GEOBUK_SHELL_INTEGRATION" ]] && source "$GEOBUK_SHELL_INTEGRATION" 2>/dev/null
         """###
