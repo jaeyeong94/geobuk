@@ -106,12 +106,6 @@ struct SidebarView: View {
                 detectedClaudeSection(processMonitor: processMonitor)
             }
 
-            // Claude 세션 상태 섹션
-            if let monitor = claudeMonitor {
-                Divider()
-                claudeSessionSection(monitor: monitor)
-            }
-
             // 파일 기반 Claude 세션 감지
             if let watcher = claudeFileWatcher, !watcher.activeSessions.isEmpty {
                 Divider()
