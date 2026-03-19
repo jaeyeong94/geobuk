@@ -154,11 +154,17 @@ final class ClaudeSessionMonitor {
                 }
             }
 
-            // 토큰 사용량
-            if let usage = event["usage"] as? [String: Any] {
+            // 토큰 사용량 (message.usage에 위치)
+            let usage: [String: Any]? =
+                (event["message"] as? [String: Any])?["usage"] as? [String: Any]
+                ?? event["usage"] as? [String: Any]
+
+            if let usage {
                 let input = usage["input_tokens"] as? Int ?? 0
                 let output = usage["output_tokens"] as? Int ?? 0
-                sessionState.processEvent(.usage(inputTokens: input, outputTokens: output))
+                let cacheRead = usage["cache_read_input_tokens"] as? Int ?? 0
+                let cacheWrite = usage["cache_creation_input_tokens"] as? Int ?? 0
+                sessionState.processEvent(.usage(inputTokens: input + cacheRead + cacheWrite, outputTokens: output))
             }
 
         case "result":

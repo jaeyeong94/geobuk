@@ -11,6 +11,9 @@ class SurfaceContainerView: NSView {
     /// 윈도우 라이브 리사이즈 중인지 여부
     private var isLiveResizing = false
 
+    /// 프로그래밍 방식 리사이즈 디바운싱 (분할 시 중간 크기 리플로우 방지)
+    private var resizeWorkItem: DispatchWorkItem?
+
     /// 라이브 리사이즈 종료 감지용 옵저버
     nonisolated(unsafe) private var resizeObservers: [NSObjectProtocol] = []
 
@@ -82,12 +85,23 @@ class SurfaceContainerView: NSView {
         surfaceView.frame.size = scrollView.bounds.size
         documentView.frame.size = scrollView.bounds.size
 
-        // 드래그 중이 아닐 때만 PTY 리사이즈 (프로그래밍 방식 리사이즈, 초기 배치 등)
+        // PTY 리사이즈: 드래그 중이면 스킵, 아니면 디바운싱 (분할 시 중간 크기 방지)
         if !isLiveResizing {
-            let size = scrollView.bounds.size
+            scheduleResize()
+        }
+    }
+
+    /// PTY 리사이즈를 50ms 디바운싱 (분할/레이아웃 변경 시 중간 크기 리플로우 방지)
+    private func scheduleResize() {
+        resizeWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            let size = self.scrollView.bounds.size
             if size.width > 0 && size.height > 0 {
-                surfaceView.sizeDidChange(size)
+                self.surfaceView.sizeDidChange(size)
             }
         }
+        resizeWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
     }
 }

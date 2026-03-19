@@ -250,20 +250,31 @@ struct SidebarView: View {
 
     @ViewBuilder
     private func fileWatcherSessionRow(session: ClaudeFileSession) -> some View {
+        let matchingWorkspace = workspaceManager.workspaces.first { ws in
+            abbreviatedPath(ws.cwd) == abbreviatedPath(session.cwd)
+                || ws.cwd == session.cwd
+        }
+
         HStack(spacing: 4) {
             Circle()
                 .fill(sessionStatusColor(for: session))
                 .frame(width: 6, height: 6)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
-                    Text("Session \(session.pid)")
+                    Text("PID \(session.pid)")
                         .font(.system(size: 10, weight: .medium))
-                    Text(abbreviatedPath(session.cwd))
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    if let ws = matchingWorkspace {
+                        Text(ws.name)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.accentColor)
+                    }
                 }
+                Text(abbreviatedPath(session.cwd))
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
                 // 세션 상태 표시 (claudeMonitor의 상태를 활용)
                 if let monitor = claudeMonitor, monitor.sessionState.phase != .idle {
                     HStack(spacing: 4) {
@@ -282,6 +293,15 @@ struct SidebarView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 3)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // 해당 워크스페이스로 전환 + 포커싱
+            if let ws = matchingWorkspace,
+               let idx = workspaceManager.workspaces.firstIndex(where: { $0.id == ws.id }) {
+                workspaceManager.switchToWorkspace(at: idx)
+                onWorkspaceSwitch?()
+            }
+        }
     }
 
     /// 세션 상태에 따른 색상
