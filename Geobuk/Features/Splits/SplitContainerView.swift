@@ -54,6 +54,9 @@ struct SplitPaneView: View {
     /// 셸 초기화 오버레이 표시 여부
     @State private var showInitOverlay = true
 
+    /// 명령 실행 중 (TUI 모드 — 터미널 직접 입력)
+    @State private var isCommandRunning = false
+
     var body: some View {
         ZStack {
             switch content {
@@ -64,7 +67,9 @@ struct SplitPaneView: View {
                             TerminalSurfaceRepresentable(
                                 surfaceView: surfaceView
                             )
-                            .onAppear { surfaceView.blockInputMode = true }
+                            .onAppear {
+                                if !isCommandRunning { surfaceView.blockInputMode = true }
+                            }
 
                             // 셸 초기화 완료 전까지 오버레이
                             if showInitOverlay {
@@ -93,12 +98,36 @@ struct SplitPaneView: View {
                             }
                         }
 
+                        if !isCommandRunning {
                         BlockInputBar(
                             paneFocused: isFocused,
                             currentDirectory: surfaceView.currentDirectory,
                             onSubmit: { command in
+                                // 명령 실행 중: 터미널 직접 입력 활성화 (TUI 앱 대응)
+                                isCommandRunning = true
+                                surfaceView.blockInputMode = false
+                                surfaceView.window?.makeFirstResponder(surfaceView)
+
                                 surfaceView.sendText(command)
                                 surfaceView.sendKeyPress(keyCode: 36, char: "\r")
+
+                                // precmd 복귀 감지: 셸이 precmd에서 시그널 파일을 터치
+                                let signalFile = "/tmp/geobuk-precmd-\(surfaceView.viewId.uuidString)"
+                                try? FileManager.default.removeItem(atPath: signalFile)
+
+                                Task { @MainActor in
+                                    // 시그널 파일이 생성될 때까지 대기 (precmd 실행 = 명령 완료)
+                                    for _ in 0..<6000 { // 최대 10분
+                                        try? await Task.sleep(nanoseconds: 100_000_000)
+                                        if FileManager.default.fileExists(atPath: signalFile) {
+                                            try? FileManager.default.removeItem(atPath: signalFile)
+                                            break
+                                        }
+                                    }
+                                    // 블록 입력 모드 복귀
+                                    isCommandRunning = false
+                                    surfaceView.blockInputMode = true
+                                }
                             },
                             onTab: {
                                 // macOS Tab keycode = 48
@@ -109,6 +138,7 @@ struct SplitPaneView: View {
                                 surfaceView.sendKeyPress(keyCode: 8, char: "c", mods: GHOSTTY_MODS_CTRL)
                             }
                         )
+                        } // if !isCommandRunning
                     }
                 } else {
                     Color.black
