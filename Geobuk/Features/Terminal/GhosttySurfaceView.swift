@@ -51,9 +51,11 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         surfaceConfig.context = GHOSTTY_SURFACE_CONTEXT_WINDOW
 
         // 환경 변수 준비: 셸 통합 스크립트가 사용할 surface ID와 소켓 경로
-        let envVarDefs: [(String, String)] = [
+        var envVarDefs: [(String, String)] = [
             ("GEOBUK_SURFACE_ID", viewId.uuidString),
             ("GEOBUK_SOCKET_PATH", SocketServer.defaultSocketPath),
+            // ZDOTDIR로 커스텀 .zshrc 로드 → 프롬프트 테마 비활성화
+            ("ZDOTDIR", BlockModeZshSetup.zdotdir),
         ]
 
         // C 문자열 포인터를 ghostty_surface_new 호출 전까지 유지해야 함
@@ -83,11 +85,10 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
             envVars.append(ghostty_env_var_s(key: cKey, value: cValue))
         }
 
-        // 셸 통합 스크립트 자동 소싱 (initial_input으로 투명하게 주입)
-        // 셸 시작 직후 source 명령을 보내고 clear로 화면 정리
-        let sourceCmd = "[[ -n \"$GEOBUK_SHELL_INTEGRATION\" ]] && source \"$GEOBUK_SHELL_INTEGRATION\" 2>/dev/null; clear\r"
+        // 셸 시작 후 화면 정리 (ZDOTDIR의 .zshrc에서 셸 통합이 로드됨)
+        let sourceCmd = "clear\r"
         let cSourceCmd = strdup(sourceCmd)!
-        cKeys.append(cSourceCmd) // free 목록에 추가
+        cKeys.append(cSourceCmd)
         surfaceConfig.initial_input = UnsafePointer(cSourceCmd)
 
         envVars.withUnsafeMutableBufferPointer { buffer in
