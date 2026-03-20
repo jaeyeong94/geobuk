@@ -1,6 +1,6 @@
-# Xcode
-*.xcodeproj/xcuserdata/
-*.xcworkspace/xcuserdata/
+# Xcode (xcodegen으로 자동 생성)
+*.xcodeproj
+*.xcworkspace
 DerivedData/
 *.moved-aside
 *.pbxuser
