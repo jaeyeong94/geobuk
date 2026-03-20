@@ -294,7 +294,3 @@ Tagged by component (`[Terminal]`, `[Claude]`, `[Shell]`, `[Socket]`, etc.). Aut
 ## license
 
 MIT
-
----
-
-*Built with Claude Code.*

@@ -78,19 +78,8 @@ struct SplitPaneView: View {
                                 currentDir = surfaceView.currentDirectory
                             }
 
-                            // 셸 영역 클릭 처리
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    onTap()
-                                    if isRunning {
-                                        // 인터렉티브 모드: 터미널에 포커스 복원 (앱 전환 후 복귀 대응)
-                                        surfaceView.window?.makeFirstResponder(surfaceView)
-                                    } else {
-                                        // 블록 모드: 입력창에 포커스
-                                        inputFocusTrigger.toggle()
-                                    }
-                                }
+                            // 스크롤 이벤트를 차단하지 않도록 오버레이 제거
+                            // 탭 처리는 외부 컨테이너의 onTapGesture에서 처리
 
                             // 셸 초기화 완료 전까지 오버레이
                             if showInitOverlay {
@@ -201,7 +190,16 @@ struct SplitPaneView: View {
         }
         .border(isFocused ? Color.blue.opacity(0.6) : Color.gray.opacity(0.2), width: 1)
         .contentShape(Rectangle())
-        .onTapGesture { onTap() }
+        .onTapGesture {
+            onTap()
+            if let surfaceView = surfaceViewProvider(content.id) {
+                if isRunning {
+                    surfaceView.window?.makeFirstResponder(surfaceView)
+                } else {
+                    inputFocusTrigger.toggle()
+                }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .geobukShellPromptReady)) { notification in
             guard case .terminal = content,
                   let surfaceView = surfaceViewProvider(content.id),

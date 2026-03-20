@@ -500,6 +500,158 @@ struct CompletionProviderTests {
         }
     }
 
+    // MARK: - 상대 경로 완성
+
+    @Suite("상대 경로 완성")
+    struct RelativePathTests {
+
+        @Test("dotSlash_현재디렉토리기준")
+        func dotSlash_usesCwd() {
+            // /usr에서 "./" → /usr 내 항목
+            let results = CompletionProvider.filePathCandidates(
+                for: "cd ./",
+                currentDirectory: "/usr"
+            )
+            #expect(results.count >= 2) // bin, lib 등
+        }
+
+        @Test("dotDotSlash_상위디렉토리기준")
+        func dotDotSlash_parentDir() {
+            // /usr/bin에서 "../" → /usr 내 항목
+            let results = CompletionProvider.filePathCandidates(
+                for: "cd ../",
+                currentDirectory: "/usr/bin"
+            )
+            #expect(results.count >= 2) // bin, lib 등
+        }
+
+        @Test("dotDotSlash_prefix매칭")
+        func dotDotSlash_withPrefix() {
+            // /usr/bin에서 "../li" → /usr/lib 등
+            let results = CompletionProvider.filePathCandidates(
+                for: "cd ../li",
+                currentDirectory: "/usr/bin"
+            )
+            #expect(results.count >= 1)
+        }
+
+        @Test("dotDotDotDotSlash_깊은상대경로")
+        func deepRelative_noCrash() {
+            let results = CompletionProvider.filePathCandidates(
+                for: "ls ../../",
+                currentDirectory: "/usr/local/bin"
+            )
+            // /usr 내 항목
+            #expect(results.count >= 1)
+        }
+
+        @Test("currentDirectory없으면_상대경로무시")
+        func noCurrentDir_noResults() {
+            let results = CompletionProvider.filePathCandidates(
+                for: "cd ./",
+                currentDirectory: nil
+            )
+            #expect(results.isEmpty)
+        }
+    }
+
+    // MARK: - 서브커맨드 완성
+
+    @Suite("서브커맨드 완성")
+    struct SubcommandTests {
+
+        @Test("git_서브커맨드후보반환")
+        func gitSubcommands() {
+            let results = CompletionProvider.subcommandCandidates(for: "git sta")
+            // ShellCompletionProvider 또는 fallback에서 최소 1개 이상 매칭
+            #expect(!results.isEmpty)
+            #expect(results.contains("git status"))
+        }
+
+        @Test("git_공백만_전체서브커맨드")
+        func gitSpace_allSubcommands() {
+            let results = CompletionProvider.subcommandCandidates(for: "git ")
+            #expect(results.count > 20)
+            #expect(results.contains("git push"))
+        }
+
+        @Test("docker_서브커맨드")
+        func dockerSubcommands() {
+            let results = CompletionProvider.subcommandCandidates(for: "docker ru")
+            #expect(results.contains("docker run"))
+        }
+
+        @Test("npm_서브커맨드")
+        func npmSubcommands() {
+            let results = CompletionProvider.subcommandCandidates(for: "npm in")
+            #expect(results.contains("npm init"))
+            #expect(results.contains("npm install"))
+        }
+
+        @Test("미등록명령어_빈배열")
+        func unknownCommand_empty() {
+            let results = CompletionProvider.subcommandCandidates(for: "zzz foo")
+            #expect(results.isEmpty)
+        }
+
+        @Test("명령어만_공백없음_빈배열")
+        func noSpace_empty() {
+            let results = CompletionProvider.subcommandCandidates(for: "git")
+            #expect(results.isEmpty)
+        }
+
+        @Test("suggestAll에서_서브커맨드반영")
+        func suggestAll_includesSubcommands() {
+            let results = CompletionProvider.suggestAll(
+                for: "git ch",
+                currentDirectory: nil,
+                history: CommandHistory()
+            )
+            #expect(results.contains("git checkout"))
+            #expect(results.contains("git cherry-pick"))
+        }
+    }
+
+    // MARK: - 환경변수 완성
+
+    @Suite("환경변수 완성")
+    struct EnvVarTests {
+
+        @Test("달러HOME_환경변수후보")
+        func dollarHome_envVar() {
+            let results = CompletionProvider.envVarCandidates(for: "echo $HO")
+            #expect(results.contains("echo $HOME"))
+        }
+
+        @Test("달러PATH_환경변수후보")
+        func dollarPath_envVar() {
+            let results = CompletionProvider.envVarCandidates(for: "$PA")
+            #expect(results.contains("$PATH"))
+        }
+
+        @Test("달러없으면_빈배열")
+        func noDollar_empty() {
+            let results = CompletionProvider.envVarCandidates(for: "HOME")
+            #expect(results.isEmpty)
+        }
+
+        @Test("달러만_너무짧아서빈배열")
+        func dollarOnly_empty() {
+            let results = CompletionProvider.envVarCandidates(for: "$")
+            #expect(results.isEmpty)
+        }
+
+        @Test("suggestAll에서_환경변수반영")
+        func suggestAll_includesEnvVars() {
+            let results = CompletionProvider.suggestAll(
+                for: "echo $HO",
+                currentDirectory: nil,
+                history: CommandHistory()
+            )
+            #expect(results.contains("echo $HOME"))
+        }
+    }
+
     // MARK: - 퍼징 / 랜덤 입력
 
     @Suite("퍼징 테스트")

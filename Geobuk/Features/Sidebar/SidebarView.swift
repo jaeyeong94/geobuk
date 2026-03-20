@@ -273,7 +273,7 @@ struct SidebarView: View {
     @ViewBuilder
     private func fileWatcherSessionRow(session: ClaudeFileSession) -> some View {
         let matchingWorkspace = workspaceManager.workspaces.first { ws in
-            abbreviatedPath(ws.cwd) == abbreviatedPath(session.cwd)
+            PathAbbreviator.abbreviate(ws.cwd) == PathAbbreviator.abbreviate(session.cwd)
                 || ws.cwd == session.cwd
         }
 
@@ -321,7 +321,7 @@ struct SidebarView: View {
                 }
 
                 // 라인 3: 경로
-                Text(abbreviatedPath(session.cwd))
+                Text(PathAbbreviator.abbreviate(session.cwd))
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -381,10 +381,6 @@ struct SidebarView: View {
         let minutes = Int(seconds) / 60
         let secs = Int(seconds) % 60
         return "\(minutes)m \(secs)s"
-    }
-
-    private func abbreviatedPath(_ path: String) -> String {
-        PathAbbreviator.abbreviate(path)
     }
 
     // MARK: - Claude Session Section
@@ -569,7 +565,7 @@ struct WorkspaceTabView: View {
 
                         // 활성 워크스페이스: 경로를 같은 줄에 표시
                         if isActive {
-                            Text(abbreviatedPath(displayCwd ?? workspace.cwd))
+                            Text(PathAbbreviator.abbreviate(displayCwd ?? workspace.cwd))
                                 .font(.system(size: 10))
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
@@ -581,7 +577,7 @@ struct WorkspaceTabView: View {
                 // 비활성 워크스페이스: 상세 정보를 인라인으로 표시
                 if !isActive {
                     // 경로
-                    Text(abbreviatedPath(displayCwd ?? workspace.cwd))
+                    Text(PathAbbreviator.abbreviate(displayCwd ?? workspace.cwd))
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
@@ -650,11 +646,6 @@ struct WorkspaceTabView: View {
             Divider()
             Button("Close") { onClose() }
         }
-    }
-
-    /// 경로를 축약하여 표시 (홈 디렉토리 -> ~)
-    private func abbreviatedPath(_ path: String) -> String {
-        PathAbbreviator.abbreviate(path)
     }
 
 }

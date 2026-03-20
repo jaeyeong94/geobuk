@@ -112,7 +112,7 @@ struct PaneRowView: View {
 
                 if let dir = pane.currentDirectory {
                     Text(" ")
-                    Text(abbreviatedPath(dir))
+                    Text(PathAbbreviator.abbreviate(dir))
                         .font(.system(size: 9))
                         .foregroundColor(.secondary.opacity(0.5))
                         .lineLimit(1)
@@ -190,9 +190,6 @@ struct PaneRowView: View {
         }
     }
 
-    private func abbreviatedPath(_ path: String) -> String {
-        PathAbbreviator.abbreviate(path)
-    }
 }
 
 

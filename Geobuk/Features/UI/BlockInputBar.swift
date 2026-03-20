@@ -18,6 +18,9 @@ struct BlockInputBar: View {
     /// 방향키로 확정된 선택 값 (Enter 시 사용)
     @State private var confirmedSelection: String? = nil
 
+    /// 디바운스용 완성 태스크 (빠른 타이핑 시 이전 요청 취소)
+    @State private var completionTask: Task<Void, Never>?
+
     /// 패널이 포커스되어 있는지 (외부에서 전달)
     var paneFocused: Bool = false
 
@@ -323,25 +326,39 @@ struct BlockInputBar: View {
 
     // MARK: - Completion & Suggestions
 
-    /// 입력 변경 시 완성 후보 목록을 갱신한다 (1회 호출로 힌트 + 리스트 모두 처리)
+    /// 입력 변경 시 완성 후보 목록을 갱신한다 (100ms 디바운스 + 백그라운드 I/O)
     private func updateCompletions(for text: String) {
-        let candidates = CompletionProvider.suggestAll(
-            for: text,
-            currentDirectory: currentDirectory,
-            history: commandHistory
-        )
+        completionTask?.cancel()
+        completionTask = Task {
+            // 100ms 디바운스 — 빠른 타이핑 시 이전 요청 취소
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            guard !Task.isCancelled else { return }
 
-        // 인라인 힌트: 첫 번째 후보에서 입력 부분을 제외한 나머지
-        if let first = candidates.first, first.hasPrefix(text), first != text {
-            completionHint = String(first.dropFirst(text.count))
-        } else {
-            completionHint = nil
-        }
+            let cwd = currentDirectory
+            let history = commandHistory
 
-        // 후보가 바뀌었을 때만 인덱스 리셋 (방향키로 선택 중인 상태 유지)
-        if candidates != suggestions {
-            suggestions = candidates
-            selectedSuggestionIndex = candidates.isEmpty ? -1 : 0
+            // 파일 I/O를 포함한 완성 탐색을 백그라운드에서 실행
+            let candidates = await Task.detached(priority: .userInitiated) {
+                CompletionProvider.suggestAll(
+                    for: text,
+                    currentDirectory: cwd,
+                    history: history
+                )
+            }.value
+
+            guard !Task.isCancelled else { return }
+
+            // UI 업데이트 (MainActor)
+            if let first = candidates.first, first.hasPrefix(text), first != text {
+                completionHint = String(first.dropFirst(text.count))
+            } else {
+                completionHint = nil
+            }
+
+            if candidates != suggestions {
+                suggestions = candidates
+                selectedSuggestionIndex = candidates.isEmpty ? -1 : 0
+            }
         }
     }
 
@@ -372,6 +389,8 @@ struct BlockInputBar: View {
 
     /// suggestion 목록과 인라인 힌트를 모두 닫는다
     private func dismissSuggestions() {
+        completionTask?.cancel()
+        completionTask = nil
         completionHint = nil
         suggestions = []
         selectedSuggestionIndex = -1
