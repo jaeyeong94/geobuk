@@ -121,6 +121,7 @@ final class NotificationCoordinator {
     func markAsRead(_ id: UUID) {
         unreadNotifications.removeAll { $0.id == id }
         activeAlerts.removeAll { $0.notificationId == id }
+        updateDockBadge()
     }
 
     /// 특정 소스의 모든 알림을 읽음 처리한다 (패널 포커스 시)
@@ -128,12 +129,14 @@ final class NotificationCoordinator {
     func markAllAsRead(source: String) {
         unreadNotifications.removeAll { $0.source.contains(source) }
         activeAlerts.removeAll { $0.source.contains(source) }
+        updateDockBadge()
     }
 
     /// 모든 알림을 읽음 처리한다
     func markAllAsRead() {
         unreadNotifications.removeAll()
         activeAlerts.removeAll()
+        updateDockBadge()
     }
 
     /// 히스토리를 모두 삭제한다
@@ -141,6 +144,15 @@ final class NotificationCoordinator {
         allNotifications.removeAll()
         unreadNotifications.removeAll()
         activeAlerts.removeAll()
+        updateDockBadge()
+    }
+
+    // MARK: - Dock Badge
+
+    /// Dock 아이콘 뱃지를 읽지 않은 알림 수로 갱신한다
+    private func updateDockBadge() {
+        let count = unreadNotifications.count
+        NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
     }
 
     // MARK: - 패널별 알림 조회
@@ -169,6 +181,9 @@ final class NotificationCoordinator {
             type: alertType,
             timestamp: notification.timestamp
         ))
+
+        // Dock 뱃지 갱신
+        updateDockBadge()
 
         // macOS 네이티브 알림 (앱이 비활성일 때)
         if nativeNotificationsEnabled {
