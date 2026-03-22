@@ -94,44 +94,21 @@ struct SplitPaneView: View {
         return surfaceView.viewId.uuidString
     }
 
-    /// 알림 링 애니메이션 시작
+    /// 알림 링 애니메이션 시작 — 포커스할 때까지 유지 (자동 사라짐 없음)
     private func startRingAnimation(for alertType: PaneAlertType) {
         ringDismissTask?.cancel()
         ringColor = color(for: alertType)
 
         switch alertType {
         case .permissionRequest:
-            // 펄싱 애니메이션: 0→1→0 반복
+            // 펄싱 애니메이션: 0→1→0 반복 — 포커스할 때까지 유지
             withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
                 ringOpacity = 1.0
             }
 
-        case .sessionComplete:
-            // 3초 후 페이드아웃
+        case .sessionComplete, .commandComplete, .error:
+            // 정적 링 — 포커스할 때까지 유지
             withAnimation(.easeIn(duration: 0.2)) { ringOpacity = 1.0 }
-            ringDismissTask = Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                guard !Task.isCancelled else { return }
-                withAnimation(.easeOut(duration: 0.4)) { ringOpacity = 0 }
-            }
-
-        case .commandComplete:
-            // 2초 후 페이드아웃
-            withAnimation(.easeIn(duration: 0.2)) { ringOpacity = 1.0 }
-            ringDismissTask = Task {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                guard !Task.isCancelled else { return }
-                withAnimation(.easeOut(duration: 0.4)) { ringOpacity = 0 }
-            }
-
-        case .error:
-            // 3초 후 페이드아웃
-            withAnimation(.easeIn(duration: 0.2)) { ringOpacity = 1.0 }
-            ringDismissTask = Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                guard !Task.isCancelled else { return }
-                withAnimation(.easeOut(duration: 0.4)) { ringOpacity = 0 }
-            }
         }
     }
 
