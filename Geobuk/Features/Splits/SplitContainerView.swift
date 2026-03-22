@@ -69,13 +69,30 @@ struct SplitPaneView: View {
             case .terminal:
                 if let surfaceView = surfaceViewProvider(content.id) {
                     VStack(spacing: 0) {
-                        ZStack {
+                        ZStack(alignment: .topTrailing) {
                             TerminalSurfaceRepresentable(
                                 surfaceView: surfaceView
                             )
                             .onAppear {
                                 if !surfaceView.isCommandRunning { surfaceView.blockInputMode = true }; isRunning = surfaceView.isCommandRunning
                                 currentDir = surfaceView.currentDirectory
+                            }
+
+                            // 패널 닫기 버튼 (우측 상단, 포커스 시에만 표시)
+                            if isFocused {
+                                Button(action: {
+                                    NotificationCenter.default.post(name: .closePane, object: nil)
+                                }) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundColor(.secondary.opacity(0.6))
+                                        .padding(6)
+                                        .background(Color(nsColor: .controlBackgroundColor).opacity(0.7))
+                                        .cornerRadius(4)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Close Pane (Cmd+W)")
+                                .padding(6)
                             }
 
                             // 스크롤 이벤트를 차단하지 않도록 오버레이 제거
@@ -102,7 +119,7 @@ struct SplitPaneView: View {
                                             if surfaceView.currentDirectory != nil { break }
                                         }
                                         currentDir = surfaceView.currentDirectory
-                                        withAnimation(.easeOut(duration: 0.2)) {
+                                        withAnimation(.easeOut(duration: 0.15)) {
                                             showInitOverlay = false
                                         }
                                     }
@@ -118,47 +135,9 @@ struct SplitPaneView: View {
                             ),
                             currentDirectory: currentDir,
                             onSubmit: { command in
-                                surfaceView.pendingCommandSubmitted = true
+                                // 명령만 전송. 모드 전환은 소켓 알림 기반으로 처리
                                 surfaceView.sendText(command)
                                 surfaceView.sendKeyPress(keyCode: 36, char: "\r")
-
-                                // precmd 시그널 파일 준비
-                                let signalFile = "/tmp/geobuk-precmd-\(surfaceView.viewId.uuidString)"
-                                try? FileManager.default.removeItem(atPath: signalFile)
-
-                                Task { @MainActor in
-                                    // 500ms 대기
-                                    try? await Task.sleep(nanoseconds: 500_000_000)
-
-                                    // 빠른 명령: 시그널 파일이 이미 생성됨 또는 소켓 알림 수신
-                                    if FileManager.default.fileExists(atPath: signalFile) || !surfaceView.pendingCommandSubmitted {
-                                        try? FileManager.default.removeItem(atPath: signalFile)
-                                        surfaceView.pendingCommandSubmitted = false
-                                        currentDir = surfaceView.currentDirectory
-                                        return
-                                    }
-
-                                    // 느린 명령: TUI 모드로 전환
-                                    surfaceView.pendingCommandSubmitted = false
-                                    surfaceView.isCommandRunning = true; isRunning = true
-                                    surfaceView.blockInputMode = false
-                                    surfaceView.window?.makeFirstResponder(surfaceView)
-
-                                    // 명령 완료 대기 (파일 폴링 + 소켓 알림 이중 감지)
-                                    for _ in 0..<6000 {
-                                        try? await Task.sleep(nanoseconds: 100_000_000)
-                                        if FileManager.default.fileExists(atPath: signalFile) || !surfaceView.isCommandRunning {
-                                            try? FileManager.default.removeItem(atPath: signalFile)
-                                            break
-                                        }
-                                    }
-
-                                    // 블록 입력 모드 복귀
-                                    surfaceView.isCommandRunning = false; isRunning = false
-                                    surfaceView.blockInputMode = true
-                                    currentDir = surfaceView.currentDirectory
-                                    inputFocusTrigger.toggle()
-                                }
                             },
                             onTab: {
                                 // macOS Tab keycode = 48
@@ -200,22 +179,53 @@ struct SplitPaneView: View {
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .geobukShellPromptReady)) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .geobukShellCommandStarted)) { notification in
+            // 셸이 preexec를 보고 → 명령 시작됨
             guard case .terminal = content,
                   let surfaceView = surfaceViewProvider(content.id),
                   let sid = notification.userInfo?["surfaceId"] as? String,
                   sid == surfaceView.viewId.uuidString else { return }
 
-            // 명령 완료 → 블록 입력 모드로 복귀
-            surfaceView.pendingCommandSubmitted = false  // 빠른 명령 타이머 취소
+            let cmd = notification.userInfo?["command"] as? String ?? ""
+            GeobukLogger.debug(.shell, "SplitPaneView received commandStarted", context: ["command": cmd, "surfaceId": sid])
+            surfaceView.shellRunning = true
+
+            // 기존 TUI 전환 대기 취소 (빠르게 연속 입력 시)
+            surfaceView.tuiTransitionTask?.cancel()
+
+            // 2초 후에도 prompt가 안 오면 TUI 모드로 전환 (느린 명령)
+            surfaceView.tuiTransitionTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                guard !Task.isCancelled, surfaceView.shellRunning else { return }
+
+                // 아직 running → 느린 명령 (next dev, vim 등)
+                surfaceView.isCommandRunning = true; isRunning = true
+                surfaceView.blockInputMode = false
+                surfaceView.window?.makeFirstResponder(surfaceView)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .geobukShellPromptReady)) { notification in
+            // 셸이 precmd를 보고 → 명령 완료됨
+            guard case .terminal = content,
+                  let surfaceView = surfaceViewProvider(content.id),
+                  let sid = notification.userInfo?["surfaceId"] as? String,
+                  sid == surfaceView.viewId.uuidString else { return }
+
+            GeobukLogger.debug(.shell, "SplitPaneView received promptReady", context: ["surfaceId": sid, "wasRunning": "\(surfaceView.isCommandRunning)", "cwd": surfaceView.currentDirectory ?? "nil"])
+            surfaceView.shellRunning = false
+
+            // TUI 전환 대기 취소 (빠른 명령이 완료됨)
+            surfaceView.tuiTransitionTask?.cancel()
+            surfaceView.tuiTransitionTask = nil
 
             if surfaceView.isCommandRunning {
+                // TUI → 블록 모드 복귀
                 surfaceView.isCommandRunning = false; isRunning = false
                 surfaceView.blockInputMode = true
                 currentDir = surfaceView.currentDirectory
                 inputFocusTrigger.toggle()
             } else {
-                // 빠른 명령도 CWD 갱신
+                // 빠른 명령 — CWD만 갱신
                 currentDir = surfaceView.currentDirectory
             }
         }

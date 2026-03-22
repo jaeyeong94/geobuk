@@ -13,6 +13,7 @@ struct SidebarView: View {
     var onCreateWorkspace: (() -> Void)?
     var onNewClaudeSession: (() -> Void)?
     var onPaneFocus: ((UUID) -> Void)?
+    var onClose: (() -> Void)?
     @State private var editingIndex: Int? = nil
     @State private var editingName: String = ""
     @State private var expandedWorkspaces: Set<Int> = []
@@ -38,13 +39,21 @@ struct SidebarView: View {
                 }
                 .buttonStyle(.plain)
                 .help("New Workspace")
+
+                Button(action: { onClose?() }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Close Sidebar (Cmd+B)")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
             Divider()
 
-            // 전체 스크롤 (워크스페이스 + Claude 섹션)
+            // 스크롤 영역 (워크스페이스 + Claude 섹션)
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(Array(workspaceManager.workspaces.enumerated()), id: \.element.id) { index, workspace in
@@ -123,16 +132,15 @@ struct SidebarView: View {
                     Divider()
                     fileWatcherSection(watcher: watcher)
                 }
+            }
 
-                // 시스템 상태 섹션
-                if let systemMonitor {
-                    Divider()
-                    systemStatusSection(monitor: systemMonitor)
-                        .padding(.bottom, 8)
-                }
+            // 시스템 상태 섹션 (하단 고정)
+            if let systemMonitor {
+                Divider()
+                systemStatusSection(monitor: systemMonitor)
+                    .padding(.bottom, 8)
             }
         }
-        .frame(minWidth: 160, idealWidth: 200, maxWidth: 280)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
     }
 
@@ -212,7 +220,7 @@ struct SidebarView: View {
                         .fill(Color.green)
                         .frame(width: 6, height: 6)
                     Text("\(info.processName) (PID \(info.claudePid))")
-                        .font(.system(size: 10))
+                        .font(.system(size: 11))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                     Spacer()
@@ -222,7 +230,7 @@ struct SidebarView: View {
             }
 
             Text("\(processMonitor.claudeProcesses.count) sessions active")
-                .font(.system(size: 9))
+                .font(.system(size: 10))
                 .foregroundColor(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
@@ -261,7 +269,7 @@ struct SidebarView: View {
                 HStack {
                     Spacer()
                     Text(String(format: "Total: $%.2f", monitor.sessionState.costUSD))
-                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(.secondary)
                 }
                 .padding(.horizontal, 12)
@@ -286,14 +294,14 @@ struct SidebarView: View {
                 // 라인 1: 모델 + phase
                 HStack(spacing: 4) {
                     Text(claudeMonitor?.sessionModels[session.sessionId] ?? "claude")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .foregroundColor(.primary)
                         .lineLimit(1)
 
                     if let state = claudeMonitor?.getState(for: session.sessionId),
                        state.phase != .idle {
                         Text(phaseText(state.phase, toolName: state.currentToolName))
-                            .font(.system(size: 9))
+                            .font(.system(size: 10))
                             .foregroundColor(state.phase == .waitingForInput ? .yellow : .secondary)
                             .lineLimit(1)
                     }
@@ -304,25 +312,25 @@ struct SidebarView: View {
                     if let state = claudeMonitor?.getState(for: session.sessionId),
                        state.tokenUsage.totalTokens > 0 {
                         Text(SessionFormatter.formatTokenCount(state.tokenUsage.totalTokens))
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(size: 10, design: .monospaced))
                             .foregroundColor(.secondary)
                     }
                     if let state = claudeMonitor?.getState(for: session.sessionId),
                        state.costUSD > 0 {
                         Text(String(format: "$%.2f", state.costUSD))
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(size: 10, design: .monospaced))
                             .foregroundColor(.orange)
                     }
                     if let durationMs = claudeMonitor?.sessionTurnDurations[session.sessionId] {
                         Text(formatDuration(durationMs))
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(size: 10, design: .monospaced))
                             .foregroundColor(.secondary)
                     }
                 }
 
                 // 라인 3: 경로
                 Text(PathAbbreviator.abbreviate(session.cwd))
-                    .font(.system(size: 9))
+                    .font(.system(size: 10))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -420,9 +428,9 @@ struct SidebarView: View {
                 Button(action: { onNewClaudeSession?() }) {
                     HStack(spacing: 4) {
                         Image(systemName: "terminal")
-                            .font(.system(size: 10))
-                        Text("New Session")
                             .font(.system(size: 11))
+                        Text("New Session")
+                            .font(.system(size: 12))
                     }
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity)
@@ -458,11 +466,11 @@ struct SidebarView: View {
 
             HStack(spacing: 8) {
                 Text(String(format: "CPU: %d%%", Int(monitor.cpuUsage * 100)))
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.secondary)
 
                 Text(String(format: "MEM: %d%%", memoryPercent(monitor: monitor)))
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.secondary)
 
                 Spacer()
@@ -471,17 +479,17 @@ struct SidebarView: View {
 
             HStack(spacing: 4) {
                 Text("↓")
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(.green)
                 Text(formatBytes(monitor.networkBytesIn))
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.secondary)
 
                 Text("↑")
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(.blue)
                 Text(formatBytes(monitor.networkBytesOut))
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.secondary)
 
                 Spacer()
@@ -538,7 +546,7 @@ struct WorkspaceTabView: View {
             // 트리 접기/펼치기 인디케이터 또는 숫자 인덱스
             if isActive {
                 Text(isTreeExpanded ? "\u{25BC}" : "\u{25B6}")
-                    .font(.system(size: 8))
+                    .font(.system(size: 9))
                     .foregroundColor(.secondary)
                     .frame(width: 14)
             } else {
@@ -552,21 +560,21 @@ struct WorkspaceTabView: View {
                 if isEditing {
                     TextField("Name", text: $editingName, onCommit: onCommitRename)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .focused($isTextFieldFocused)
                         .onExitCommand(perform: onCancelRename)
                         .onAppear { isTextFieldFocused = true }
                 } else {
                     HStack(spacing: 4) {
                         Text(workspace.name)
-                            .font(.system(size: 12, weight: isActive ? .semibold : .regular))
+                            .font(.system(size: 13, weight: isActive ? .semibold : .regular))
                             .lineLimit(1)
                             .truncationMode(.tail)
 
                         // 활성 워크스페이스: 경로를 같은 줄에 표시
                         if isActive {
                             Text(PathAbbreviator.abbreviate(displayCwd ?? workspace.cwd))
-                                .font(.system(size: 10))
+                                .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
@@ -578,7 +586,7 @@ struct WorkspaceTabView: View {
                 if !isActive {
                     // 경로
                     Text(PathAbbreviator.abbreviate(displayCwd ?? workspace.cwd))
-                        .font(.system(size: 10))
+                        .font(.system(size: 11))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -587,10 +595,10 @@ struct WorkspaceTabView: View {
                     if let processName = activeProcessName {
                         HStack(spacing: 3) {
                             Text("$")
-                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
                                 .foregroundColor(.secondary)
                             Text(processName)
-                                .font(.system(size: 9, design: .monospaced))
+                                .font(.system(size: 10, design: .monospaced))
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
                         }
@@ -603,11 +611,11 @@ struct WorkspaceTabView: View {
                                 .fill(Color.green)
                                 .frame(width: 5, height: 5)
                             Text("Claude x\(claudeSessionCount)")
-                                .font(.system(size: 9, weight: .medium))
+                                .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(.green)
                             if totalCost > 0 {
                                 Text(SessionFormatter.formatCost(totalCost))
-                                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
                                     .foregroundColor(.secondary)
                             }
                         }
@@ -617,13 +625,13 @@ struct WorkspaceTabView: View {
                     if !listeningPorts.isEmpty {
                         HStack(spacing: 4) {
                             ForEach(listeningPorts.prefix(4), id: \.self) { port in
-                                Text(":\(port)")
-                                    .font(.system(size: 9, design: .monospaced))
+                                Text(verbatim: ":\(port)")
+                                    .font(.system(size: 10, design: .monospaced))
                                     .foregroundColor(.orange)
                             }
                             if listeningPorts.count > 4 {
                                 Text("+\(listeningPorts.count - 4)")
-                                    .font(.system(size: 9))
+                                    .font(.system(size: 10))
                                     .foregroundColor(.secondary)
                             }
                         }

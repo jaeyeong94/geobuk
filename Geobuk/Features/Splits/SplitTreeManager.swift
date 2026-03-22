@@ -91,9 +91,9 @@ final class SplitTreeManager {
             break
         case .updated(let newRoot):
             saveSnapshot()
-            root = newRoot
+            root = newRoot.equalized()
             // 포커스를 남은 패널 중 첫 번째로 이동
-            let leaves = newRoot.allLeaves()
+            let leaves = root.allLeaves()
             focusedPaneId = leaves.first?.id
             // 패널이 하나만 남으면 최대화 해제
             if leaves.count <= 1 {

@@ -9,7 +9,7 @@ struct SystemMonitorTests {
 
     @Test("ProcessStat_초기화_정상생성")
     func processStat_init_createsCorrectly() {
-        let stat = ProcessStat(pid: 1234, name: "node", cpuPercent: 12.5, memoryMB: 64)
+        let stat = ProcessStat(pid: 1234, name: "node", cpuPercent: 12.5, memoryMB: 64, executablePath: "/usr/local/bin/node")
         #expect(stat.pid == 1234)
         #expect(stat.name == "node")
         #expect(stat.cpuPercent == 12.5)
@@ -19,13 +19,13 @@ struct SystemMonitorTests {
 
     @Test("ProcessStat_Identifiable_pidをidとして使用")
     func processStat_identifiable_usesPidAsId() {
-        let stat = ProcessStat(pid: 42, name: "proc", cpuPercent: 0, memoryMB: 0)
+        let stat = ProcessStat(pid: 42, name: "proc", cpuPercent: 0, memoryMB: 0, executablePath: nil)
         #expect(stat.id == stat.pid)
     }
 
     @Test("ProcessStat_Sendable준수")
     func processStat_sendable_conformance() {
-        let stat = ProcessStat(pid: 1, name: "test", cpuPercent: 0, memoryMB: 0)
+        let stat = ProcessStat(pid: 1, name: "test", cpuPercent: 0, memoryMB: 0, executablePath: nil)
         let sendable: any Sendable = stat
         #expect(sendable is ProcessStat)
     }
@@ -151,8 +151,10 @@ struct SystemMonitorTests {
         #expect(stats[0].cpuPercent == 12.5)
         #expect(stats[0].memoryMB == 4)     // 4096 KB / 1024
         #expect(stats[0].name == "node")    // 경로의 마지막 컴포넌트
+        #expect(stats[0].executablePath == "/usr/bin/node")
         #expect(stats[1].pid == 456)
         #expect(stats[1].cpuPercent == 0.1)
+        #expect(stats[1].executablePath == nil)  // 경로 없이 이름만
     }
 
     @Test("parsePsOutput_빈입력_빈배열반환")

@@ -42,12 +42,18 @@ final class ShellStateManager {
         )
         GeobukLogger.debug(.shell, "Shell state changed", context: ["surfaceId": surfaceId, "state": state, "command": command ?? ""])
 
-        // 프롬프트 상태로 전환 시 알림 발송 (명령 완료 감지용)
+        // 셸 상태 전환 알림
         if state == "prompt" {
             NotificationCenter.default.post(
                 name: .geobukShellPromptReady,
                 object: nil,
                 userInfo: ["surfaceId": surfaceId]
+            )
+        } else if state == "running" {
+            NotificationCenter.default.post(
+                name: .geobukShellCommandStarted,
+                object: nil,
+                userInfo: ["surfaceId": surfaceId, "command": command ?? ""]
             )
         }
     }
@@ -66,6 +72,8 @@ final class ShellStateManager {
 extension Notification.Name {
     /// 셸이 프롬프트 상태로 전환될 때 발생 (userInfo: ["surfaceId": String])
     static let geobukShellPromptReady = Notification.Name("geobukShellPromptReady")
+    /// 셸이 명령 실행을 시작할 때 발생 (userInfo: ["surfaceId": String, "command": String])
+    static let geobukShellCommandStarted = Notification.Name("geobukShellCommandStarted")
 }
 
 extension ShellStateManager {

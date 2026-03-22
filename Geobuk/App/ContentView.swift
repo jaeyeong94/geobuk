@@ -23,6 +23,15 @@ struct ContentView: View {
     @State private var claudeLaunchSettings = ClaudeLaunchSettings()
     @State private var pricingManager = ClaudePricingManager()
     @State private var shellStateManager = ShellStateManager()
+    @State private var terminalProcessProvider = TerminalProcessProvider()
+    @State private var isRightPanelVisible = true
+    /// 우측 패널에 전달할 현재 디렉토리 (셸 프롬프트 복귀 시 갱신)
+    @State private var focusedDirectory: String?
+    /// 사이드바 드래그 리사이즈 너비
+    @State private var leftSidebarWidth: CGFloat = 200
+    @State private var rightSidebarWidth: CGFloat = 350
+    /// 패널 포커스 전환 시 우측 패널 강제 갱신용 카운터
+    @State private var rightPanelRefreshTrigger: Int = 0
 
     var body: some View {
         mainContent
@@ -60,7 +69,21 @@ struct ContentView: View {
                     }
                 },
                 onNewClaudeSession: { startNewClaudeSession() },
-                onOpenSettings: { isSettingsOpen.toggle() }
+                onOpenSettings: { isSettingsOpen.toggle() },
+                onToggleRightPanel: {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        isRightPanelVisible.toggle()
+                    }
+                },
+                onIncreaseFontSize: { adjustFontSize(delta: 1) },
+                onDecreaseFontSize: { adjustFontSize(delta: -1) },
+                onSwitchRightPanelTab: { notification in
+                    // Ctrl+숫자: 패널 닫혀있으면 열면서 전환
+                    if !isRightPanelVisible {
+                        isRightPanelVisible = true
+                    }
+                    // RightSidebarView의 onReceive에서 탭 전환 처리
+                }
             ))
             .popover(isPresented: $isSettingsOpen, arrowEdge: .trailing) {
                 TerminalSettingsView(
@@ -84,13 +107,24 @@ struct ContentView: View {
                     }
                 )
             }
+            .onReceive(NotificationCenter.default.publisher(for: .geobukShellPromptReady)) { _ in
+                updateFocusedDirectory()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .geobukPWDChanged)) { notification in
+                // PWD 변경 시 포커스된 패널의 디렉토리인지 확인 후 갱신
+                if let sv = notification.object as? GhosttySurfaceView,
+                   let focusedId = activeManager?.focusedPaneId,
+                   surfaceViews[focusedId] === sv {
+                    focusedDirectory = sv.currentDirectory
+                }
+            }
             .onDisappear {
                 autoSaveTimer?.invalidate()
                 processMonitor.stopMonitoring()
                 systemMonitor.stopMonitoring()
                 claudeMonitor.stopAll()
                 claudeFileWatcher.stopWatching()
-                SessionPersistence.save(manager: workspaceManager)
+                SessionPersistence.save(manager: workspaceManager, surfaceViews: surfaceViews)
                 Task { await socketServer?.stop() }
                 sessionManager.destroyAllSessions()
                 for surfaceView in surfaceViews.values {
@@ -117,13 +151,64 @@ struct ContentView: View {
                             surfaceViews: surfaceViews,
                             onWorkspaceSwitch: { ensureSurfaceForActiveWorkspace() },
                             onCreateWorkspace: { createNewWorkspace() },
-                            onNewClaudeSession: { startNewClaudeSession() }
+                            onNewClaudeSession: { startNewClaudeSession() },
+                            onClose: { isSidebarVisible = false }
                         )
-                        Divider()
+                        .frame(width: leftSidebarWidth)
+
+                        // 드래그 리사이즈 핸들
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.01))
+                            .frame(width: 4)
+                            .gesture(
+                                DragGesture()
+                                    .onChanged { value in
+                                        leftSidebarWidth = max(160, leftSidebarWidth + value.translation.width)
+                                    }
+                            )
+                            .onHover { isHovered in
+                                if isHovered { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                            }
                     }
 
                     workspaceContentView
                         .id(workspaceManager.activeWorkspace?.id)
+
+                    if isRightPanelVisible {
+                        // 드래그 리사이즈 핸들
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.01))
+                            .frame(width: 4)
+                            .gesture(
+                                DragGesture()
+                                    .onChanged { value in
+                                        rightSidebarWidth = max(350, rightSidebarWidth - value.translation.width)
+                                    }
+                            )
+                            .onHover { isHovered in
+                                if isHovered { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                            }
+
+                        RightSidebarView(
+                            provider: terminalProcessProvider,
+                            systemMonitor: systemMonitor,
+                            surfaceView: activeManager?.focusedPaneId.flatMap { surfaceViews[$0] },
+                            claudeMonitor: claudeMonitor,
+                            claudeFileWatcher: claudeFileWatcher,
+                            currentDirectory: focusedDirectory,
+                            refreshTrigger: rightPanelRefreshTrigger,
+                            onClose: { isRightPanelVisible = false },
+                            onExecuteCommand: { command in
+                                // 현재 포커스된 터미널에 명령어 전송
+                                if let focusedId = activeManager?.focusedPaneId,
+                                   let sv = surfaceViews[focusedId] {
+                                    sv.sendText(command)
+                                    sv.sendKeyPress(keyCode: 36, char: "\r")
+                                }
+                            }
+                        )
+                        .frame(width: rightSidebarWidth)
+                    }
                 }
             } else if let errorMessage {
                 VStack(spacing: 12) {
@@ -248,11 +333,14 @@ struct ContentView: View {
             for workspace in workspaceManager.workspaces {
                 for leaf in workspace.splitManager.root.allLeaves() {
                     if surfaceViews[leaf.id] == nil {
-                        let surfaceView = GhosttySurfaceView(app: ghosttyApp)
+                        // 복원된 CWD가 있으면 해당 디렉토리에서 셸 시작
+                        let cwd = restoredCwdMap[leaf.id]
+                        let surfaceView = GhosttySurfaceView(app: ghosttyApp, cwd: cwd)
                         surfaceViews[leaf.id] = surfaceView
                     }
                 }
             }
+            restoredCwdMap.removeAll()
 
             isInitialized = true
             GeobukLogger.info(.app, "App initialized", context: ["workspaces": "\(workspaceManager.workspaces.count)"])
@@ -261,6 +349,10 @@ struct ContentView: View {
             if let focusedId = activeManager?.focusedPaneId {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     focusSurfaceView(id: focusedId)
+                }
+                // 셸 초기화 후 디렉토리 갱신 (OSC 7 응답 대기)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    updateFocusedDirectory()
                 }
             }
 
@@ -275,6 +367,9 @@ struct ContentView: View {
 
             // 셸 포트 폴링 시작
             shellStateManager.startPortPolling()
+
+            // 터미널 프로세스 모니터 시작
+            terminalProcessProvider.startMonitoring()
 
             // Claude 가격 fetch + 모니터/설정 연결
             claudeMonitor.pricingManager = pricingManager
@@ -301,27 +396,26 @@ struct ContentView: View {
 
     // MARK: - Session Restore
 
+    /// 패널별 CWD 매핑 (복원 시 surface 생성에 사용)
+    @State private var restoredCwdMap: [UUID: String] = [:]
+
     @MainActor
     private func restoreFromPersistedState(_ state: PersistedState) {
         guard !state.workspaces.isEmpty else { return }
 
         var restoredWorkspaces: [Workspace] = []
         for persistedWs in state.workspaces {
-            let workspace = Workspace(name: persistedWs.name, cwd: persistedWs.cwd)
-            // splitManager의 root를 복원된 레이아웃으로 교체
-            let restoredRoot = SessionPersistence.splitNode(from: persistedWs.splitLayout)
+            var cwdMap: [UUID: String] = [:]
+            let restoredRoot = SessionPersistence.splitNode(from: persistedWs.splitLayout, cwdMap: &cwdMap)
             let leaves = restoredRoot.allLeaves()
             let focusedId = leaves.first?.id
 
-            // SplitTreeManager를 복원된 트리로 재생성
             let manager = SplitTreeManager(root: restoredRoot, focusedPaneId: focusedId)
-            // workspace의 splitManager는 let이므로 새 workspace를 만들 수 없음
-            // 대신 WorkspaceManager를 새로 생성
-            // Workspace init에서 splitManager가 생성되므로, 복원용 init 필요
-
-            // 워크스페이스를 복원된 splitManager로 생성
             let restoredWs = Workspace(name: persistedWs.name, cwd: persistedWs.cwd, splitManager: manager)
             restoredWorkspaces.append(restoredWs)
+
+            // 패널별 CWD 저장 (surface 생성 시 사용)
+            restoredCwdMap.merge(cwdMap) { _, new in new }
         }
 
         let activeIndex = min(state.activeIndex, restoredWorkspaces.count - 1)
@@ -368,7 +462,7 @@ struct ContentView: View {
 
         // 패널이 1개이고 워크스페이스도 1개면 앱 종료
         if splitManager.paneCount <= 1 && workspaceManager.workspaces.count <= 1 {
-            SessionPersistence.save(manager: workspaceManager)
+            SessionPersistence.save(manager: workspaceManager, surfaceViews: surfaceViews)
             NSApplication.shared.terminate(nil)
             return
         }
@@ -407,7 +501,7 @@ struct ContentView: View {
 
         // 패널이 1개이고 워크스페이스도 1개면 앱 종료
         if splitManager.paneCount <= 1 && workspaceManager.workspaces.count <= 1 {
-            SessionPersistence.save(manager: workspaceManager)
+            SessionPersistence.save(manager: workspaceManager, surfaceViews: surfaceViews)
             NSApplication.shared.terminate(nil)
             return
         }
@@ -503,14 +597,18 @@ struct ContentView: View {
         guard isInitialized else { return }
 
         // 현재 활성 터미널에 claude 명령어 전송
-        if let focusedId = activeManager?.focusedPaneId,
-           let surfaceView = surfaceViews[focusedId] {
-            // PTY 로그 파일을 통한 모니터링 시작
-            claudeMonitor.monitor(surfaceViewId: surfaceView.viewId)
+        guard let focusedId = activeManager?.focusedPaneId,
+              let surfaceView = surfaceViews[focusedId] else { return }
 
-            let command = claudeLaunchSettings.buildCommand()
-            surfaceView.sendText(command + "\r")
-        }
+        // PTY 로그 파일을 통한 모니터링 시작
+        claudeMonitor.monitor(surfaceViewId: surfaceView.viewId)
+
+        let command = claudeLaunchSettings.buildCommand()
+
+        // 명령만 전송 — 모드 전환은 소켓 알림 기반으로 자동 처리
+        // (preexec → 2초 후 TUI 전환, precmd → 블록 복귀)
+        surfaceView.sendText(command)
+        surfaceView.sendKeyPress(keyCode: 36, char: "\r")
     }
 
     // MARK: - Auto Save
@@ -519,7 +617,7 @@ struct ContentView: View {
     private func startAutoSaveTimer() {
         autoSaveTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
             Task { @MainActor in
-                SessionPersistence.save(manager: workspaceManager)
+                SessionPersistence.save(manager: workspaceManager, surfaceViews: surfaceViews)
             }
         }
     }
@@ -552,6 +650,21 @@ struct ContentView: View {
             }
         }
         // 블록 모드: BlockInputBar의 focusTrigger가 처리
+        updateFocusedDirectory()
+    }
+
+    /// 현재 포커스된 패널의 디렉토리를 우측 패널용으로 갱신
+    @MainActor
+    private func updateFocusedDirectory() {
+        focusedDirectory = activeManager?.focusedPaneId.flatMap { surfaceViews[$0]?.currentDirectory }
+        rightPanelRefreshTrigger += 1
+    }
+
+    /// Cmd+/Cmd- 로 폰트 크기 1pt 증감
+    @MainActor
+    private func adjustFontSize(delta: Double) {
+        fontSize = max(8, min(32, fontSize + delta))
+        setFontSizeForAllSurfaces(fontSize)
     }
 
     /// 모든 surface의 폰트 크기를 binding action으로 변경
@@ -618,6 +731,10 @@ private struct WorkspaceNotificationModifier: ViewModifier {
     let onSwitchWorkspace: (Notification) -> Void
     let onNewClaudeSession: () -> Void
     let onOpenSettings: () -> Void
+    let onToggleRightPanel: () -> Void
+    let onIncreaseFontSize: () -> Void
+    let onDecreaseFontSize: () -> Void
+    let onSwitchRightPanelTab: (Notification) -> Void
 
     func body(content: Content) -> some View {
         content
@@ -638,6 +755,18 @@ private struct WorkspaceNotificationModifier: ViewModifier {
             }
             .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
                 onOpenSettings()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleRightPanel)) { _ in
+                onToggleRightPanel()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .increaseFontSize)) { _ in
+                onIncreaseFontSize()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .decreaseFontSize)) { _ in
+                onDecreaseFontSize()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .switchRightPanelTab)) { notification in
+                onSwitchRightPanelTab(notification)
             }
     }
 }

@@ -40,6 +40,7 @@ actor SocketServer {
         self.socketPath = geobukDir.appendingPathComponent("geobuk.sock").path
         self.sessionManager = sessionManager
         self.shellStateManager = shellStateManager
+        GeobukLogger.info(.socket, "SocketServer init", context: ["hasShellState": "\(shellStateManager != nil)"])
     }
 
     /// 기본 소켓 경로를 반환하는 정적 헬퍼
@@ -172,45 +173,42 @@ actor SocketServer {
     // MARK: - Client Handler
 
     private func handleClient(_ clientFd: Int32, sessionManager: SessionManager) async {
-        var buffer = [UInt8](repeating: 0, count: 65536)
-        var accumulated = Data()
+        // Blocking read를 별도 스레드에서 실행하여 Swift 동시성 스레드 풀 차단 방지
+        let accumulated: Data = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                var buffer = [UInt8](repeating: 0, count: 65536)
+                var data = Data()
 
-        // Set client socket to non-blocking for read with cancellation checks
-        let flags = fcntl(clientFd, F_GETFL, 0)
-        _ = fcntl(clientFd, F_SETFL, flags | O_NONBLOCK)
+                // 짧은 타임아웃 — fire-and-forget 클라이언트가 보내고 바로 끊음
+                var timeout = timeval(tv_sec: 0, tv_usec: 100_000) // 100ms
+                setsockopt(clientFd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
 
-        while !Task.isCancelled {
-            let bytesRead = Darwin.read(clientFd, &buffer, buffer.count)
-            if bytesRead == 0 { break } // Client disconnected
-            if bytesRead < 0 {
-                if errno == EAGAIN || errno == EWOULDBLOCK {
-                    try? await Task.sleep(for: .milliseconds(10))
-                    continue
+                while true {
+                    let bytesRead = Darwin.read(clientFd, &buffer, buffer.count)
+                    if bytesRead <= 0 { break }
+                    data.append(contentsOf: buffer[0..<bytesRead])
                 }
-                break // Error
+
+                continuation.resume(returning: data)
             }
+        }
 
-            accumulated.append(contentsOf: buffer[0..<bytesRead])
+        let preview = String(data: accumulated.prefix(200), encoding: .utf8) ?? "(non-utf8)"
+        GeobukLogger.debug(.socket, "Client data received", context: ["bytes": "\(accumulated.count)", "preview": preview])
 
-            // 줄 단위로 JSON-RPC 요청 처리 (newline-delimited)
-            while let newlineRange = accumulated.range(of: Data([0x0A])) {
-                let lineData = accumulated[accumulated.startIndex..<newlineRange.lowerBound]
-                accumulated.removeSubrange(accumulated.startIndex...newlineRange.lowerBound)
+        // 줄 단위로 JSON-RPC 요청 처리
+        let lines = accumulated.split(separator: 0x0A)
+        GeobukLogger.debug(.socket, "Parsed lines", context: ["count": "\(lines.count)"])
+        for lineData in lines {
+            guard !lineData.isEmpty else { continue }
 
-                guard !lineData.isEmpty else { continue }
-
-                let response = await processRequest(Data(lineData), sessionManager: sessionManager)
-                if let responseData = response {
-                    var responseWithNewline = responseData
-                    responseWithNewline.append(0x0A)
-
-                    // Temporarily set blocking for write
-                    _ = fcntl(clientFd, F_SETFL, flags)
-                    responseWithNewline.withUnsafeBytes { ptr in
-                        guard let baseAddress = ptr.baseAddress else { return }
-                        _ = Darwin.write(clientFd, baseAddress, ptr.count)
-                    }
-                    _ = fcntl(clientFd, F_SETFL, flags | O_NONBLOCK)
+            let response = await processRequest(Data(lineData), sessionManager: sessionManager)
+            if let responseData = response {
+                var responseWithNewline = responseData
+                responseWithNewline.append(0x0A)
+                responseWithNewline.withUnsafeBytes { ptr in
+                    guard let baseAddress = ptr.baseAddress else { return }
+                    _ = Darwin.write(clientFd, baseAddress, ptr.count)
                 }
             }
         }
@@ -221,6 +219,7 @@ actor SocketServer {
     private func processRequest(_ data: Data, sessionManager: SessionManager) async -> Data? {
         do {
             let request = try JSONDecoder().decode(JSONRPCRequest.self, from: data)
+            GeobukLogger.debug(.socket, "Request decoded", context: ["method": request.method, "hasShellState": "\(shellStateManager != nil)"])
             let router = await APIMethodRouter(sessionManager: sessionManager, shellStateManager: shellStateManager)
             let response = await router.route(request)
             return try JSONEncoder().encode(response)

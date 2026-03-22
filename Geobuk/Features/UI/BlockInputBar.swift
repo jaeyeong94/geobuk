@@ -21,6 +21,15 @@ struct BlockInputBar: View {
     /// 디바운스용 완성 태스크 (빠른 타이핑 시 이전 요청 취소)
     @State private var completionTask: Task<Void, Never>?
 
+    /// Git 브랜치 이름 (nil이면 git 저장소 아님)
+    @State private var gitBranch: String? = nil
+
+    /// Git 수정/미추적 파일 수
+    @State private var gitModified: Int = 0
+
+    /// Git 스테이지된 파일 수
+    @State private var gitStaged: Int = 0
+
     /// 패널이 포커스되어 있는지 (외부에서 전달)
     var paneFocused: Bool = false
 
@@ -65,9 +74,22 @@ struct BlockInputBar: View {
         }
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
         .task(id: "\(paneFocused)-\(focusTrigger)") {
+            // 포커스된 패널에서만 입력창에 포커스 설정
+            guard paneFocused else { return }
             // 약간의 지연 후 포커스 (뷰 계층 안정화 대기)
             try? await Task.sleep(nanoseconds: 100_000_000)
             isInputFocused = true
+        }
+        .onChange(of: paneFocused) { _, focused in
+            if !focused {
+                isInputFocused = false
+            }
+        }
+        .onChange(of: currentDirectory) { _, _ in
+            updateGitInfo()
+        }
+        .onAppear {
+            updateGitInfo()
         }
     }
 
@@ -178,6 +200,25 @@ struct BlockInputBar: View {
                     .lineLimit(1)
             }
 
+            // Git 정보: 브랜치명, 수정 파일 수, 스테이지된 파일 수
+            if let branch = gitBranch {
+                Text(branch)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.purple)
+
+                if gitModified > 0 {
+                    Text("±\(gitModified)")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.orange)
+                }
+
+                if gitStaged > 0 {
+                    Text("+\(gitStaged)")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.green)
+                }
+            }
+
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -223,6 +264,11 @@ struct BlockInputBar: View {
                         return .handled
                     }
                     .onKeyPress(.rightArrow) {
+                        if showSuggestionList {
+                            let idx = selectedSuggestionIndex >= 0 ? selectedSuggestionIndex : 0
+                            applySuggestion(at: idx)
+                            return .handled
+                        }
                         if acceptCompletionHint() { return .handled }
                         return .ignored
                     }
@@ -261,6 +307,84 @@ struct BlockInputBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
+    }
+
+    // MARK: - Git Info
+
+    /// 현재 디렉토리의 git 브랜치와 상태를 백그라운드에서 갱신한다
+    private func updateGitInfo() {
+        let cwd = currentDirectory
+        Task.detached(priority: .utility) {
+            let (branch, modified, staged) = Self.fetchGitInfo(in: cwd)
+            await MainActor.run {
+                gitBranch = branch
+                gitModified = modified
+                gitStaged = staged
+            }
+        }
+    }
+
+    /// git 정보를 동기적으로 조회한다 (백그라운드 스레드에서 호출)
+    /// - Parameter directory: 조회할 디렉토리 경로 (nil이면 nil 반환)
+    /// - Returns: (브랜치명, 수정파일수, 스테이지파일수) — git 저장소 아니면 (nil, 0, 0)
+    nonisolated private static func fetchGitInfo(in directory: String?) -> (String?, Int, Int) {
+        guard let directory else { return (nil, 0, 0) }
+
+        // 브랜치명 조회
+        let branchOutput = runGit(args: ["rev-parse", "--abbrev-ref", "HEAD"], in: directory)
+        guard let rawBranch = branchOutput?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawBranch.isEmpty,
+              rawBranch != "HEAD" || true  // detached HEAD도 표시
+        else {
+            return (nil, 0, 0)
+        }
+        let branch = rawBranch == "HEAD" ? "HEAD" : rawBranch
+
+        // porcelain 상태 조회
+        let statusOutput = runGit(args: ["status", "--porcelain"], in: directory) ?? ""
+        var modified = 0
+        var staged = 0
+
+        for line in statusOutput.components(separatedBy: "\n") {
+            guard line.count >= 2 else { continue }
+            let index = line[line.startIndex]   // 스테이징 영역 상태
+            let worktree = line[line.index(after: line.startIndex)]  // 워킹트리 상태
+
+            // 스테이징 영역에 변경사항이 있는 경우 (M, A, D, R, C)
+            if "MADRC".contains(index) {
+                staged += 1
+            }
+            // 워킹트리에 수정/미추적 파일이 있는 경우
+            if worktree == "M" || worktree == "D" || index == "?" {
+                modified += 1
+            }
+        }
+
+        return (branch, modified, staged)
+    }
+
+    /// `/usr/bin/git`을 지정 디렉토리에서 실행하고 표준 출력을 반환한다
+    nonisolated private static func runGit(args: [String], in directory: String) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["--no-optional-locks"] + args
+        process.currentDirectoryURL = URL(fileURLWithPath: directory)
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()  // stderr 무시
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return nil
+        }
+
+        guard process.terminationStatus == 0 else { return nil }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        return String(data: data, encoding: .utf8)
     }
 
     // MARK: - Actions

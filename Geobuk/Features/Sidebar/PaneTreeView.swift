@@ -178,7 +178,7 @@ struct PaneRowView: View {
                                 .foregroundColor(.secondary.opacity(0.6))
                         }
 
-                        Text(":\(port)")
+                        Text(verbatim: ":\(port)")
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
                             .foregroundColor(.orange)
 

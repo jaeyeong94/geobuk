@@ -45,6 +45,9 @@ _geobuk_preexec() {
     local cmd="${1//\"/\\\"}"
     _geobuk_send '{"jsonrpc":"2.0","method":"shell.reportState","params":{"surfaceId":"'"$GEOBUK_SURFACE_ID"'","state":"running","command":"'"$cmd"'"}}'
 
+    # 명령 시작 시 precmd 시그널 파일 삭제 (앱에서 빠른/느린 명령 판별용)
+    rm -f "/tmp/geobuk-precmd-${GEOBUK_SURFACE_ID}" 2>/dev/null
+
     # 셸이 echo한 명령어 줄을 지우고 블록 헤더로 대체
     # 커서를 한 줄 위로 이동 + 줄 전체 삭제
     printf '\e[1A\e[2K'
@@ -61,17 +64,15 @@ _geobuk_preexec() {
     printf '\e[0m\n'
 }
 
-# JSON-RPC 메시지를 Geobuk 소켓으로 전송 (fire-and-forget)
-# 소켓 전송 실패해도 셸 동작에 영향 없음
-# 모든 출력(stdout/stderr/job notifications)을 완전 억제
+# JSON-RPC 메시지를 Geobuk 소켓으로 동기 전송
+# 백그라운드(&!)는 zsh job control 지연을 유발하므로 동기로 실행
+# socat -t 0.1: 100ms 타임아웃으로 셸 블로킹 최소화
 _geobuk_send() {
-    {
-        if command -v socat &>/dev/null; then
-            echo "$1" | socat - UNIX-CONNECT:"$GEOBUK_SOCKET_PATH" 2>/dev/null
-        else
-            echo "$1" | nc -U -w 1 "$GEOBUK_SOCKET_PATH" 2>/dev/null
-        fi
-    } &>/dev/null &!
+    if command -v socat &>/dev/null; then
+        echo "$1" | socat -t 0.1 - UNIX-CONNECT:"$GEOBUK_SOCKET_PATH" 2>/dev/null
+    else
+        echo "$1" | nc -U -w 0 "$GEOBUK_SOCKET_PATH" 2>/dev/null
+    fi
 }
 
 # SIGWINCH 핸들러: 리사이즈 시 reflow 아티팩트 완화

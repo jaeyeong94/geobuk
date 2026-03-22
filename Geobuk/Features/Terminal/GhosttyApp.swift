@@ -80,6 +80,7 @@ final class GhosttyApp {
                                 guard surfaceView.hasSurface else { return }
                                 GeobukLogger.debug(.terminal, "PWD action received", context: ["pwd": pwd])
                                 surfaceView.currentDirectory = pwd
+                                NotificationCenter.default.post(name: .geobukPWDChanged, object: surfaceView)
                             }
                         }
                     }
@@ -266,4 +267,6 @@ extension Notification.Name {
     static let ghosttySurfaceClosed = Notification.Name("ghosttySurfaceClosed")
     /// 자식 프로세스 종료 시 발생 (userInfo: ["exitCode": UInt32])
     static let ghosttySurfaceChildExited = Notification.Name("ghosttySurfaceChildExited")
+    /// 셸의 작업 디렉토리 변경 시 발생 (object: GhosttySurfaceView)
+    static let geobukPWDChanged = Notification.Name("geobukPWDChanged")
 }

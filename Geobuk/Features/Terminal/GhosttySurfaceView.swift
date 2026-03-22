@@ -202,8 +202,11 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     /// 블록 입력창 텍스트 (워크스페이스 전환에도 유지)
     var pendingInputText: String = ""
 
-    /// 명령 제출 후 prompt 대기 중 (500ms 타이머 취소용)
-    var pendingCommandSubmitted: Bool = false
+    /// 셸이 preexec를 보고한 후 아직 precmd가 오지 않은 상태 (명령 실행 중)
+    var shellRunning: Bool = false
+
+    /// TUI 전환 대기 태스크 (precmd가 오면 취소)
+    var tuiTransitionTask: Task<Void, Never>?
 
     /// 블록 입력 모드일 때 터미널 직접 입력 비활성화
     var blockInputMode: Bool = false {

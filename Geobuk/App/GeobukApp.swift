@@ -52,6 +52,18 @@ struct GeobukApp: App {
                 .keyboardShortcut(",", modifiers: .command)
 
                 Divider()
+
+                Button("Increase Font Size") {
+                    NotificationCenter.default.post(name: .increaseFontSize, object: nil)
+                }
+                .keyboardShortcut("+", modifiers: .command)
+
+                Button("Decrease Font Size") {
+                    NotificationCenter.default.post(name: .decreaseFontSize, object: nil)
+                }
+                .keyboardShortcut("-", modifiers: .command)
+
+                Divider()
             }
 
             CommandGroup(after: .windowArrangement) {
@@ -59,6 +71,21 @@ struct GeobukApp: App {
                     NotificationCenter.default.post(name: .toggleSidebar, object: nil)
                 }
                 .keyboardShortcut("b", modifiers: .command)
+
+                Button("Toggle Right Panel") {
+                    NotificationCenter.default.post(name: .toggleRightPanel, object: nil)
+                }
+                .keyboardShortcut("b", modifiers: [.command, .shift])
+
+                // Ctrl+1~9: 우측 패널 탭 전환 (패널이 닫혀있으면 열면서 전환)
+                ForEach(1...9, id: \.self) { number in
+                    Button("Right Panel \(number)") {
+                        NotificationCenter.default.post(name: .switchRightPanelTab, object: number)
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character("\(number)")), modifiers: .control)
+                }
+
+                Divider()
 
                 Button("Toggle Maximize") {
                     NotificationCenter.default.post(name: .toggleMaximize, object: nil)
@@ -113,4 +140,8 @@ extension Notification.Name {
     static let switchWorkspaceByNumber = Notification.Name("switchWorkspaceByNumber")
     static let newClaudeSession = Notification.Name("newClaudeSession")
     static let openSettings = Notification.Name("openSettings")
+    static let toggleRightPanel = Notification.Name("toggleRightPanel")
+    static let increaseFontSize = Notification.Name("increaseFontSize")
+    static let decreaseFontSize = Notification.Name("decreaseFontSize")
+    static let switchRightPanelTab = Notification.Name("switchRightPanelTab")
 }
