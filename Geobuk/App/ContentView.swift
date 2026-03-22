@@ -40,8 +40,8 @@ struct ContentView: View {
             .frame(minWidth: 600, minHeight: 400)
             .background(Color(nsColor: .windowBackgroundColor))
             .toolbar {
-                // 좌측: 앱 로고 + 워크스페이스 이름
-                ToolbarItem(placement: .navigation) {
+                // 가운데: 앱 로고 + 워크스페이스 이름 + 경로
+                ToolbarItem(placement: .principal) {
                     HStack(spacing: 6) {
                         Text("GEOBUK")
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
