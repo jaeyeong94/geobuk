@@ -53,7 +53,7 @@ struct ContentView: View {
                 onFocusDirection: { notification in
                     if let direction = notification.object as? NavigationDirection {
                         activeManager?.focusPane(direction: direction)
-                        if let id = activeManager?.focusedPaneId { focusSurfaceView(id: id) }
+                        if let id = activeManager?.focusedPaneId { focusSurfaceView(id: id, userInitiated: true) }
                     }
                 },
                 onClosePane: { withAnimation(.easeInOut(duration: 0.15)) { closeFocusedPane() } },
@@ -387,7 +387,7 @@ struct ContentView: View {
                     focusedPaneId: splitManager.focusedPaneId,
                     onFocusPane: { id in
                         splitManager.setFocusedPane(id: id)
-                        focusSurfaceView(id: id)
+                        focusSurfaceView(id: id, userInitiated: true)
                     },
                     surfaceViewProvider: { id in
                         surfaceViews[id]
@@ -729,19 +729,21 @@ struct ContentView: View {
     // MARK: - Focus
 
     @MainActor
-    private func focusSurfaceView(id: UUID) {
+    /// userInitiated: true = 사용자 클릭/키보드로 포커스 전환 (알림 읽음 처리)
+    ///                false = 시스템 자동 포커스 (명령 완료 후 블록 복귀 등, 알림 유지)
+    private func focusSurfaceView(id: UUID, userInitiated: Bool = false) {
         guard let surfaceView = surfaceViews[id] else { return }
         if surfaceView.isCommandRunning {
-            // 인터렉티브 모드: 터미널에 직접 포커스 (딜레이로 뷰 재생성 대기)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 surfaceView.window?.makeFirstResponder(surfaceView)
             }
         }
-        // 블록 모드: BlockInputBar의 focusTrigger가 처리
         updateFocusedDirectory()
 
-        // 해당 패널의 알림을 읽음 처리
-        notificationCoordinator.markAllAsRead(source: surfaceView.viewId.uuidString)
+        // 사용자가 직접 포커스한 경우에만 알림 읽음 처리
+        if userInitiated {
+            notificationCoordinator.markAllAsRead(source: surfaceView.viewId.uuidString)
+        }
     }
 
     /// 현재 포커스된 패널의 디렉토리를 우측 패널용으로 갱신
