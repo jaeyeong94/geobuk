@@ -36,5 +36,9 @@ Vendor/ghostty/.zig-cache/
 .env
 .env.local
 
+# Claude Code
+CLAUDE.md
+.claude/
+
 # OMC state
 .omc/
