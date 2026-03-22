@@ -30,8 +30,8 @@ struct ContentView: View {
     /// 우측 패널에 전달할 현재 디렉토리 (셸 프롬프트 복귀 시 갱신)
     @State private var focusedDirectory: String?
     /// 사이드바 드래그 리사이즈 너비
-    @State private var leftSidebarWidth: CGFloat = 200
-    @State private var rightSidebarWidth: CGFloat = 350
+    @AppStorage("leftSidebarWidth") private var leftSidebarWidth: Double = 200
+    @AppStorage("rightSidebarWidth") private var rightSidebarWidth: Double = 350
     /// 패널 포커스 전환 시 우측 패널 강제 갱신용 카운터
     @State private var rightPanelRefreshTrigger: Int = 0
 
@@ -181,7 +181,7 @@ struct ContentView: View {
                             .gesture(
                                 DragGesture()
                                     .onChanged { value in
-                                        leftSidebarWidth = max(160, leftSidebarWidth + value.translation.width)
+                                        leftSidebarWidth = min(700, max(160, leftSidebarWidth + value.translation.width))
                                     }
                             )
                             .onHover { isHovered in
@@ -200,7 +200,7 @@ struct ContentView: View {
                             .gesture(
                                 DragGesture()
                                     .onChanged { value in
-                                        rightSidebarWidth = max(350, rightSidebarWidth - value.translation.width)
+                                        rightSidebarWidth = min(700, max(350, rightSidebarWidth - value.translation.width))
                                     }
                             )
                             .onHover { isHovered in
