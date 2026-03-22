@@ -152,7 +152,10 @@ final class NotificationCoordinator {
     /// Dock 아이콘 뱃지를 읽지 않은 알림 수로 갱신한다
     private func updateDockBadge() {
         let count = unreadNotifications.count
-        NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
+        let label = count > 0 ? "\(count)" : nil
+        NSApp.dockTile.badgeLabel = label
+        NSApp.dockTile.display()
+        GeobukLogger.debug(.app, "Dock badge updated", context: ["count": "\(count)", "label": label ?? "nil"])
     }
 
     // MARK: - 패널별 알림 조회
