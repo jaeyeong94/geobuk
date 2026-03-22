@@ -103,6 +103,9 @@ final class APIMethodRouter {
         }
     }
 
+    /// sendKeys 최대 페이로드 크기 (64KB)
+    private static let maxSendKeysSize = 65_536
+
     private func handleSessionSendKeys(_ request: JSONRPCRequest) -> JSONRPCResponse {
         guard let params = request.params,
               let name = params["name"]?.stringValue else {
@@ -114,6 +117,14 @@ final class APIMethodRouter {
         }
 
         let text = params["text"]?.stringValue ?? ""
+
+        guard text.utf8.count <= Self.maxSendKeysSize else {
+            return .error(
+                code: JSONRPCErrorCode.invalidParams.rawValue,
+                message: "Text payload exceeds maximum size of \(Self.maxSendKeysSize) bytes",
+                id: request.id
+            )
+        }
 
         do {
             try sessionManager.sendKeys(sessionName: name, text: text)
@@ -205,6 +216,14 @@ final class APIMethodRouter {
             return .error(
                 code: JSONRPCErrorCode.invalidParams.rawValue,
                 message: "Missing required parameters: surfaceId, tty",
+                id: request.id
+            )
+        }
+
+        guard ShellStateManager.isValidTTYName(tty) else {
+            return .error(
+                code: JSONRPCErrorCode.invalidParams.rawValue,
+                message: "Invalid TTY name: \(tty)",
                 id: request.id
             )
         }

@@ -96,7 +96,7 @@ final class GeobukLogger: Sendable {
                 handle.closeFile()
             }
         } else {
-            try? data.write(to: URL(fileURLWithPath: logPath))
+            FileManager.default.createFile(atPath: logPath, contents: data, attributes: [.posixPermissions: 0o600])
         }
     }
 

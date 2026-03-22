@@ -91,12 +91,12 @@ struct ShellStateManagerTests {
         #expect(manager.ttyNames[""] == "/dev/ttys001")
     }
 
-    @Test("reportTty_빈tty_저장됨")
+    @Test("reportTty_빈tty_검증실패로거부")
     @MainActor
-    func reportTty_emptyTty_stillStores() {
+    func reportTty_emptyTty_rejected() {
         let manager = ShellStateManager()
         manager.reportTty(surfaceId: "abc-123", tty: "")
-        #expect(manager.ttyNames["abc-123"] == "")
+        #expect(manager.ttyNames["abc-123"] == nil)
     }
 
     @Test("reportState_알수없는state값_그대로저장")

@@ -89,6 +89,9 @@ actor SocketServer {
             throw SocketServerError.bindFailed
         }
 
+        // 소켓 파일 퍼미션을 owner-only로 설정 (0600)
+        chmod(socketPath, 0o600)
+
         // listen
         guard listen(serverFd, 5) == 0 else {
             Darwin.close(serverFd)
@@ -168,6 +171,9 @@ actor SocketServer {
 
     // MARK: - Client Handler
 
+    /// 클라이언트당 최대 수신 크기 (1MB)
+    private static let maxReceiveSize = 1_048_576
+
     private func handleClient(_ clientFd: Int32, sessionManager: SessionManager) async {
         // Blocking read를 별도 스레드에서 실행하여 Swift 동시성 스레드 풀 차단 방지
         let accumulated: Data = await withCheckedContinuation { continuation in
@@ -183,6 +189,11 @@ actor SocketServer {
                     let bytesRead = Darwin.read(clientFd, &buffer, buffer.count)
                     if bytesRead <= 0 { break }
                     data.append(contentsOf: buffer[0..<bytesRead])
+                    // 최대 수신 크기 초과 시 중단
+                    if data.count > SocketServer.maxReceiveSize {
+                        GeobukLogger.warn(.socket, "Client exceeded max receive size, disconnecting", context: ["bytes": "\(data.count)"])
+                        break
+                    }
                 }
 
                 continuation.resume(returning: data)

@@ -27,8 +27,30 @@ final class ShellStateManager {
     /// 포트/프로세스 폴링 태스크
     private var portPollingTask: Task<Void, Never>?
 
-    /// TTY 이름을 등록한다
+    /// TTY 이름이 유효한 형식인지 검증한다
+    /// 허용 패턴: /dev/ttys?[0-9]+ 또는 ttys?[0-9]+
+    nonisolated static func isValidTTYName(_ tty: String) -> Bool {
+        guard !tty.isEmpty, !tty.contains("\0"), !tty.contains(" ") else { return false }
+        // /dev/ 접두사 제거
+        let name = tty.hasPrefix("/dev/") ? String(tty.dropFirst(5)) : tty
+        // ttys?[0-9]+ 패턴 검증
+        guard name.hasPrefix("tty") else { return false }
+        let afterTty = name.dropFirst(3) // "tty" 이후
+        let digits: Substring
+        if afterTty.hasPrefix("s") {
+            digits = afterTty.dropFirst(1) // "ttys" 이후
+        } else {
+            digits = afterTty // "tty" 이후
+        }
+        return !digits.isEmpty && digits.allSatisfy(\.isNumber)
+    }
+
+    /// TTY 이름을 등록한다 (유효하지 않은 TTY 이름은 거부)
     func reportTty(surfaceId: String, tty: String) {
+        guard Self.isValidTTYName(tty) else {
+            GeobukLogger.warn(.shell, "Invalid TTY name rejected", context: ["surfaceId": surfaceId, "tty": tty])
+            return
+        }
         ttyNames[surfaceId] = tty
         GeobukLogger.info(.shell, "TTY reported", context: ["surfaceId": surfaceId, "tty": tty])
     }

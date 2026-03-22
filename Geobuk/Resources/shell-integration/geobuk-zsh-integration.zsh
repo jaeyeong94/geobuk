@@ -39,10 +39,22 @@ _geobuk_precmd() {
     fi
 }
 
+# JSON 문자열 이스케이프 (개행, 탭, 백슬래시, 따옴표, 제어문자 처리)
+_geobuk_json_escape() {
+    local s="$1"
+    s="${s//\\/\\\\}"      # \ -> \\
+    s="${s//\"/\\\"}"      # " -> \"
+    s="${s//$'\n'/\\n}"    # newline -> \n
+    s="${s//$'\r'/\\r}"    # carriage return -> \r
+    s="${s//$'\t'/\\t}"    # tab -> \t
+    echo -n "$s"
+}
+
 # 명령 실행 직전 호출
 _geobuk_preexec() {
     # $1 = 실행되는 명령어 전체
-    local cmd="${1//\"/\\\"}"
+    local cmd
+    cmd=$(_geobuk_json_escape "$1")
     _geobuk_send '{"jsonrpc":"2.0","method":"shell.reportState","params":{"surfaceId":"'"$GEOBUK_SURFACE_ID"'","state":"running","command":"'"$cmd"'"}}'
 
     # 명령 시작 시 precmd 시그널 파일 삭제 (앱에서 빠른/느린 명령 판별용)
