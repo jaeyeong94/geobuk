@@ -184,7 +184,7 @@ struct ProcessPanelView: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
 
-                            Text("PID \(proc.pid) · \(proc.tty)")
+                            Text(verbatim: "PID \(proc.pid) · \(proc.tty)")
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundColor(.secondary)
                         }

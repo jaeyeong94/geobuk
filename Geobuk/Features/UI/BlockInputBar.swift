@@ -207,13 +207,13 @@ struct BlockInputBar: View {
                     .foregroundColor(.purple)
 
                 if gitModified > 0 {
-                    Text("±\(gitModified)")
+                    Text(verbatim: "±\(gitModified)")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.orange)
                 }
 
                 if gitStaged > 0 {
-                    Text("+\(gitStaged)")
+                    Text(verbatim: "+\(gitStaged)")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.green)
                 }

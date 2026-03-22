@@ -178,7 +178,6 @@ final class NotificationCoordinator {
             }
         }
 
-        GeobukLogger.debug(.app, "Dock badge updated", context: ["count": "\(count)", "label": label ?? "nil"])
     }
 
     // MARK: - 패널별 알림 조회

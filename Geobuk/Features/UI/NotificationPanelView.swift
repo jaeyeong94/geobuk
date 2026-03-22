@@ -15,7 +15,7 @@ struct NotificationPanelView: View {
 
                 let unread = coordinator?.unreadCount ?? 0
                 if unread > 0 {
-                    Text("\(unread)")
+                    Text(verbatim: "\(unread)")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 5)

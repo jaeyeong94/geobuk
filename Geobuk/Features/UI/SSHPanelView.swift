@@ -293,8 +293,7 @@ private struct SSHHostRowView: View {
 // MARK: - Preview
 
 #Preview {
-    SSHPanelView { command in
-        print("Connect: \(command)")
+    SSHPanelView { _ in
     }
     .frame(width: 220, height: 400)
 }

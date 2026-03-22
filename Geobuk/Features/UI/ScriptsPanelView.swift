@@ -34,7 +34,7 @@ struct ScriptsPanelView: View {
                 Spacer()
                 let sourceCount = Set(scripts.map(\.source)).count
                 if sourceCount > 0 {
-                    Text("\(sourceCount) file\(sourceCount == 1 ? "" : "s")")
+                    Text(verbatim: "\(sourceCount) file\(sourceCount == 1 ? "" : "s")")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary.opacity(0.6))
                 }

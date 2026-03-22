@@ -441,7 +441,7 @@ struct SnippetPanelView: View {
             }
         }
 
-        var result: [(String?, [CommandSnippet])] = order.map { ($0, dict[$0]!) }
+        var result: [(String?, [CommandSnippet])] = order.map { ($0, dict[$0] ?? []) }
         if !uncategorized.isEmpty {
             result.append((nil, uncategorized))
         }

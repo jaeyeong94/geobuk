@@ -546,7 +546,7 @@ struct WorkspaceTabView: View {
                     .foregroundColor(.secondary)
                     .frame(width: 14)
             } else {
-                Text("\(index + 1)")
+                Text(verbatim: "\(index + 1)")
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .frame(width: 14)
@@ -617,7 +617,7 @@ struct WorkspaceTabView: View {
                             Circle()
                                 .fill(Color.green)
                                 .frame(width: 5, height: 5)
-                            Text("Claude x\(claudeSessionCount)")
+                            Text(verbatim: "Claude x\(claudeSessionCount)")
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(.green)
                             if totalCost > 0 {
@@ -637,7 +637,7 @@ struct WorkspaceTabView: View {
                                     .foregroundColor(.orange)
                             }
                             if listeningPorts.count > 4 {
-                                Text("+\(listeningPorts.count - 4)")
+                                Text(verbatim: "+\(listeningPorts.count - 4)")
                                     .font(.system(size: 10))
                                     .foregroundColor(.secondary)
                             }

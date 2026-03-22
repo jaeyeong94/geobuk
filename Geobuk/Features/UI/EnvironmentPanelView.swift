@@ -121,7 +121,7 @@ struct EnvironmentPanelView: View {
                         .truncationMode(.middle)
                 }
                 if paths.count > 8 {
-                    Text("… +\(paths.count - 8) more")
+                    Text(verbatim: "… +\(paths.count - 8) more")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary.opacity(0.6))
                 }
