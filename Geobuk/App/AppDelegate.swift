@@ -1,13 +1,41 @@
 import AppKit
 import SwiftUI
+import UserNotifications
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private var windowConfigured = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 알림 클릭 시 기존 윈도우를 활성화하도록 delegate 설정
+        UNUserNotificationCenter.current().delegate = self
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
             configureWindow()
         }
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate
+
+    /// 알림 클릭 시 호출 — 기존 윈도우를 활성화 (새 윈도우 생성 방지)
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        // 기존 윈도우를 앞으로 가져오기
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.mainWindow?.makeKeyAndOrderFront(nil)
+        completionHandler()
+    }
+
+    /// 앱이 포그라운드일 때도 알림 배너 표시 허용 (선택적)
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // 앱이 포그라운드면 배너 표시하지 않음 (앱 내 알림 시스템 사용)
+        completionHandler([])
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {

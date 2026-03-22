@@ -9,6 +9,7 @@ struct GeobukApp: App {
             ContentView()
         }
         .windowStyle(.hiddenTitleBar)
+        .handlesExternalEvents(matching: Set(arrayLiteral: "*"))
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Workspace") {
