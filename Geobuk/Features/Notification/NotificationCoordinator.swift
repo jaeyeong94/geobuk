@@ -313,4 +313,6 @@ enum PaneAlertType: Sendable {
 extension Notification.Name {
     /// 새 알림이 발행되었을 때 (object: GeobukNotification)
     static let geobukNotificationPosted = Notification.Name("geobukNotificationPosted")
+    /// 패널의 알림 링 해제 (object: surfaceId String)
+    static let geobukDismissRing = Notification.Name("geobukDismissRing")
 }

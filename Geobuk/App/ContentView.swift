@@ -750,9 +750,12 @@ struct ContentView: View {
         }
         updateFocusedDirectory()
 
-        // 사용자가 직접 포커스한 경우에만 알림 읽음 처리
+        // 사용자가 직접 포커스한 경우에만 알림 읽음 처리 + 링 해제
         if userInitiated {
-            notificationCoordinator.markAllAsRead(source: surfaceView.viewId.uuidString)
+            let sid = surfaceView.viewId.uuidString
+            notificationCoordinator.markAllAsRead(source: sid)
+            // SplitPaneView에 링 해제 알림
+            NotificationCenter.default.post(name: .geobukDismissRing, object: sid)
         }
     }
 

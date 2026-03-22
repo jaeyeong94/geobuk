@@ -247,6 +247,12 @@ struct SplitPaneView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .geobukDismissRing)) { notification in
+            guard let sid = notification.object as? String,
+                  let mySid = surfaceId,
+                  sid == mySid else { return }
+            dismissRing()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .geobukNotificationPosted)) { notification in
             guard let geobukNotification = notification.object as? GeobukNotification,
                   let sid = surfaceId,
@@ -266,6 +272,17 @@ struct SplitPaneView: View {
             }()
 
             startRingAnimation(for: alertType)
+
+            // 포커스된 패널이면 깜빡임 후 자동 해제 (1초)
+            if isFocused {
+                ringDismissTask?.cancel()
+                ringDismissTask = Task {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeOut(duration: 0.3)) { ringOpacity = 0 }
+                    notificationCoordinator?.markAllAsRead(source: sid)
+                }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .geobukShellCommandStarted)) { notification in
             // 셸이 preexec를 보고 → 명령 시작됨
