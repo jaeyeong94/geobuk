@@ -79,12 +79,8 @@ struct ContentView: View {
                 },
                 onIncreaseFontSize: { adjustFontSize(delta: 1) },
                 onDecreaseFontSize: { adjustFontSize(delta: -1) },
-                onSwitchRightPanelTab: { notification in
-                    // Ctrl+숫자: 패널 닫혀있으면 열면서 전환
-                    if !isRightPanelVisible {
-                        isRightPanelVisible = true
-                    }
-                    // RightSidebarView의 onReceive에서 탭 전환 처리
+                onSwitchRightPanelTab: { _ in
+                    // RightSidebarView의 onReceive에서 isPanelExpanded 바인딩으로 직접 처리
                 }
             ))
             .popover(isPresented: $isSettingsOpen, arrowEdge: .trailing) {
