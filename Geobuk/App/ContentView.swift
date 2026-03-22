@@ -738,6 +738,9 @@ struct ContentView: View {
         }
         // 블록 모드: BlockInputBar의 focusTrigger가 처리
         updateFocusedDirectory()
+
+        // 해당 패널의 알림을 읽음 처리
+        notificationCoordinator.markAllAsRead(source: surfaceView.viewId.uuidString)
     }
 
     /// 현재 포커스된 패널의 디렉토리를 우측 패널용으로 갱신

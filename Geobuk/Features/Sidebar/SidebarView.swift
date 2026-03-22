@@ -553,7 +553,7 @@ struct WorkspaceTabView: View {
                             .font(.system(size: 13, weight: isActive ? .semibold : .regular))
                             .lineLimit(1)
                             .truncationMode(.tail)
-                            .overlay(alignment: .topTrailing) {
+                            .overlay(alignment: .topLeading) {
                                 if unreadCount > 0 {
                                     Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
                                         .font(.system(size: 9, weight: .bold))
@@ -561,7 +561,7 @@ struct WorkspaceTabView: View {
                                         .padding(.horizontal, 4)
                                         .padding(.vertical, 2)
                                         .background(Capsule().fill(Color.red))
-                                        .offset(x: 6, y: -6)
+                                        .offset(x: -8, y: -6)
                                 }
                             }
 
