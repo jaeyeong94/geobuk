@@ -359,4 +359,112 @@ myapp   1234  ted   26u  IPv4  0x111       0t0  TCP *:0 (LISTEN)
     func systemProcessNames_containsMDNSResponder() {
         #expect(SystemMonitor.systemProcessNames.contains("mDNSResponder"))
     }
+
+    // MARK: - 신규 필드 초기화 상태
+
+    @Test("init_perCoreUsage_초기빈배열")
+    @MainActor
+    func init_perCoreUsage_initiallyEmpty() {
+        let monitor = SystemMonitor()
+        #expect(monitor.perCoreUsage.isEmpty)
+    }
+
+    @Test("init_coreCount_초기0")
+    @MainActor
+    func init_coreCount_initiallyZero() {
+        let monitor = SystemMonitor()
+        #expect(monitor.coreCount == 0)
+    }
+
+    @Test("init_memoryActive_초기0")
+    @MainActor
+    func init_memoryActive_initiallyZero() {
+        let monitor = SystemMonitor()
+        #expect(monitor.memoryActive == 0)
+    }
+
+    @Test("init_memoryWired_초기0")
+    @MainActor
+    func init_memoryWired_initiallyZero() {
+        let monitor = SystemMonitor()
+        #expect(monitor.memoryWired == 0)
+    }
+
+    @Test("init_memoryCompressed_초기0")
+    @MainActor
+    func init_memoryCompressed_initiallyZero() {
+        let monitor = SystemMonitor()
+        #expect(monitor.memoryCompressed == 0)
+    }
+
+    @Test("init_swapUsed_초기0")
+    @MainActor
+    func init_swapUsed_initiallyZero() {
+        let monitor = SystemMonitor()
+        #expect(monitor.swapUsed == 0)
+    }
+
+    @Test("init_swapTotal_초기0")
+    @MainActor
+    func init_swapTotal_initiallyZero() {
+        let monitor = SystemMonitor()
+        #expect(monitor.swapTotal == 0)
+    }
+
+    @Test("init_gpuName_초기빈문자열")
+    @MainActor
+    func init_gpuName_initiallyEmptyString() {
+        let monitor = SystemMonitor()
+        #expect(monitor.gpuName == "")
+    }
+
+    @Test("init_gpuUtilization_초기0")
+    @MainActor
+    func init_gpuUtilization_initiallyZero() {
+        let monitor = SystemMonitor()
+        #expect(monitor.gpuUtilization == 0)
+    }
+
+    @Test("init_disks_초기빈배열")
+    @MainActor
+    func init_disks_initiallyEmpty() {
+        let monitor = SystemMonitor()
+        #expect(monitor.disks.isEmpty)
+    }
+
+    // MARK: - DiskInfo 모델
+
+    @Test("DiskInfo_초기화_프로퍼티정상설정")
+    func diskInfo_init_propertiesSetCorrectly() {
+        let disk = DiskInfo(
+            mountPoint: "/",
+            totalGB: 500.0,
+            usedGB: 200.0,
+            name: "Macintosh HD"
+        )
+        #expect(disk.mountPoint == "/")
+        #expect(disk.totalGB == 500.0)
+        #expect(disk.usedGB == 200.0)
+        #expect(disk.name == "Macintosh HD")
+    }
+
+    @Test("DiskInfo_Sendable준수")
+    func diskInfo_sendable_conformance() {
+        let disk = DiskInfo(mountPoint: "/", totalGB: 100.0, usedGB: 50.0, name: "Test")
+        let sendable: any Sendable = disk
+        #expect(sendable is DiskInfo)
+    }
+
+    @Test("DiskInfo_usedGB_totalGB이하")
+    func diskInfo_usedGB_notExceedsTotalGB() {
+        let disk = DiskInfo(mountPoint: "/Volumes/Data", totalGB: 1000.0, usedGB: 750.0, name: "Data")
+        #expect(disk.usedGB <= disk.totalGB)
+    }
+
+    @Test("DiskInfo_빈mountPoint_빈문자열허용")
+    func diskInfo_emptyMountPoint_allowed() {
+        let disk = DiskInfo(mountPoint: "", totalGB: 0.0, usedGB: 0.0, name: "")
+        #expect(disk.mountPoint == "")
+        #expect(disk.name == "")
+    }
 }

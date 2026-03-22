@@ -16,7 +16,7 @@
 
 ---
 
-Everything you need when working with Claude Code agents — session monitoring, token/cost tracking, multi-workspace, split panes — packed into a single terminal app. Uses [Ghostty](https://ghostty.org)'s libghostty as the terminal engine and SwiftUI for the UI. 90 Swift files, ~16,000 lines. Zero external package dependencies.
+Everything you need when working with Claude Code agents — session monitoring, token/cost tracking, multi-workspace, split panes — packed into a single terminal app. Uses [Ghostty](https://ghostty.org)'s libghostty as the terminal engine and SwiftUI for the UI. 76 Swift files, ~16,000 lines. Zero external package dependencies.
 
 Warp-style block input, command auto-completion, and shell state tracking are built in. When you run a Claude Code session, the sidebar shows the model, token usage, cost, and execution phase in real-time.
 
@@ -39,7 +39,32 @@ Warp-style block input, command auto-completion, and shell state tracking are bu
 - Horizontal / vertical splits (`Cmd+D`, `Cmd+Shift+D`)
 - Directional pane navigation (`Cmd+Option+↑↓←→`)
 - Pane maximize toggle (`Cmd+Shift+Enter`)
-- Auto-save / restore session layout (every 30 seconds)
+- Per-pane CWD saved and restored on restart (session persistence)
+
+**right sidebar panels (우측 사이드바 패널)**
+- 10 tabbed panels accessible via `Ctrl+0~9`:
+  - **Processes** (`Ctrl+1`) — per-pane process tree and listening ports
+  - **System** (`Ctrl+2`) — CPU cores heatmap, GPU usage, RAM/Swap bars, disk I/O, network bubbles
+  - **Git** (`Ctrl+3`) — branch name, staged/unstaged changes, PRs, branch graph, GitHub Actions status
+  - **Scripts** (`Ctrl+4`) — runnable entries from `package.json`, `Makefile`, `Cargo.toml`, `go.mod`, Python scripts
+  - **Docker** (`Ctrl+5`) — container and image overview
+  - **SSH** (`Ctrl+6`) — SSH host list from `~/.ssh/config`
+  - **Snippets** (`Ctrl+7`) — saved command snippets
+  - **Claude** (`Ctrl+8`) — Claude Code timeline and config viewer
+  - **Environment** (`Ctrl+9`) — environment variables for the active pane
+  - **Notifications** (`Ctrl+0`) — notification history panel
+- Toggle the panel open/closed: `Cmd+Shift+B`
+
+**notifications (알림)**
+- macOS desktop notifications for Claude session events
+- In-app notification ring — colored border animation around the window
+- Dock badge showing unread count
+- Sidebar badge on the Notifications tab icon
+- Notification panel with full history
+
+**custom title bar (커스텀 타이틀 바)**
+- JetBrains-style title bar: app info centered, action icons on the right
+- Implemented via `NSTitlebarAccessoryViewController` with `.hiddenTitleBar` window style
 
 **claude code integration (Claude Code 통합)**
 - Watches `~/.claude/sessions/` to auto-detect active sessions — no config needed
@@ -48,8 +73,8 @@ Warp-style block input, command auto-completion, and shell state tracking are bu
 - `Cmd+Shift+C` to start a new Claude session
 
 **system monitoring (시스템 모니터링)**
-- CPU / memory / network I/O in the sidebar
-- Per-pane process list and listening port tracking
+- CPU / memory / network I/O in the left sidebar
+- Detailed system panel in the right sidebar (CPU core heatmap, GPU, RAM/Swap bars, disk, network)
 
 ## install
 
@@ -114,6 +139,8 @@ Open the sidebar (`Cmd+B`) to see Claude session status:
 - Cumulative cost (USD)
 - Current phase (thinking, coding, idle, etc.)
 
+Open the right panel (`Cmd+Shift+B` or `Ctrl+8`) for the Claude timeline and config.
+
 ## claude integration
 
 Geobuk watches Claude Code's session files (`~/.claude/sessions/*.json`) to auto-detect active sessions. No configuration or Claude Code modification required.
@@ -121,15 +148,15 @@ Geobuk watches Claude Code's session files (`~/.claude/sessions/*.json`) to auto
 (Geobuk은 Claude Code의 세션 파일을 감시하여 활성 세션을 자동 감지한다. 별도 설정이나 Claude Code 수정 불필요.)
 
 ```
-┌─ Sidebar ──────────────────┐
-│ Workspaces                 │
-│  ▼ Workspace 1             │
-│    1. zsh ~/project        │
-│    2. claude (coding)      │
-│                            │
-│ Claude Sessions            │
-│  opus · coding             │
-│  12.4K tokens · $0.42      │
+┌─ Left Sidebar ─────────────┐     ┌─ Right Panel (Ctrl+8) ─────┐
+│ Workspaces                 │     │ Claude Timeline            │
+│  ▼ Workspace 1             │     │  opus · coding             │
+│    1. zsh ~/project        │     │  12.4K tokens · $0.42      │
+│    2. claude (coding)      │     │  ~/WebstormProjects/geobuk  │
+│                            │     │                            │
+│ Claude Sessions            │     │ Claude Config              │
+│  opus · coding             │     │  model, max tokens, etc.   │
+│  12.4K tokens · $0.42      │     └────────────────────────────┘
 │  ~/WebstormProjects/geobuk │
 │                            │
 │ System                     │
@@ -160,21 +187,27 @@ The integration loads after your existing `.zshrc`, so it won't conflict with yo
 ```
 geobuk/
 ├── Geobuk/
-│   ├── App/                    # entry point, ContentView
+│   ├── App/                    # entry point, ContentView, AppDelegate, AppState
 │   ├── Features/
 │   │   ├── Terminal/           # GhosttyApp, SurfaceView, Metal rendering
 │   │   ├── Splits/             # split tree, pane views
 │   │   ├── Claude/             # session monitor, pricing, file watcher
-│   │   ├── UI/                 # block input, settings, completion hints
+│   │   ├── UI/                 # block input, settings, right panel views
+│   │   │   └── Components/     # reusable UI components (CollapsibleSectionView, …)
+│   │   ├── Notification/       # NotificationCoordinator (desktop, ring, badge)
 │   │   ├── Workspace/          # workspace manager, persistence
 │   │   ├── Session/            # shell state manager
-│   │   ├── Sidebar/            # sidebar view
-│   │   ├── Process/            # process tree scanner
+│   │   ├── Sidebar/            # left sidebar view
+│   │   ├── Process/            # process tree scanner, port watcher
+│   │   ├── Browser/            # in-app browser
 │   │   └── API/                # socket server, JSON-RPC
-│   ├── Shared/                 # logger, system monitor, completion provider
+│   ├── Shared/                 # logger, system monitor, completion provider,
+│   │                           #   AppPath, ProcessRunner, GitRunner,
+│   │                           #   ColorHelpers, ClaudeConfigReader,
+│   │                           #   NonDraggableButtonArea, RingBuffer, …
 │   ├── Protocols/              # abstraction interfaces
 │   └── Resources/              # config, shell scripts, entitlements
-├── GeobukTests/                # 77 unit tests
+├── GeobukTests/                # 13 test files, ~43 unit tests
 ├── Scripts/                    # libghostty build script
 ├── Vendor/ghostty/             # libghostty submodule
 └── project.yml                 # xcodegen config
@@ -217,7 +250,7 @@ xcodebuild -scheme Geobuk -configuration Debug build
 xcodebuild test -scheme Geobuk GENERATE_INFOPLIST_FILE=YES
 ```
 
-77 tests (unit + negative + fuzz). Developed with TDD.
+Unit + negative + fuzz tests. Developed with TDD.
 
 ### logs
 
@@ -230,20 +263,20 @@ Tagged by component (`[Terminal]`, `[Claude]`, `[Shell]`, `[Socket]`, etc.). Aut
 ## architecture
 
 ```
-┌──────────────────────────────────────────────────┐
-│                     SwiftUI                      │
-│  ContentView → WorkspaceManager → SplitTree      │
-│       ↓              ↓              ↓            │
-│  SidebarView    BlockInputBar   SplitPaneView    │
-└──────┬───────────────┬──────────────┬────────────┘
-       │               │              │
-┌──────┴───────┐ ┌─────┴─────┐ ┌─────┴──────────┐
-│ Claude       │ │ Completion│ │ Terminal        │
-│ Monitor      │ │ Provider  │ │ (libghostty)    │
-│ · FileWatcher│ │ · File    │ │ · Metal render  │
-│ · Pricing    │ │ · History │ │ · PTY mgmt      │
-│ · Transcript │ │ · Command │ │ · Keyboard/IME  │
-└──────────────┘ └───────────┘ └────────┬────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                          SwiftUI                             │
+│  ContentView → WorkspaceManager → SplitTree                  │
+│       ↓              ↓              ↓              ↓         │
+│  SidebarView    BlockInputBar   SplitPaneView  RightSidebar  │
+└──────┬───────────────┬──────────────┬──────────────┬─────────┘
+       │               │              │              │
+┌──────┴───────┐ ┌─────┴─────┐ ┌─────┴──────────┐ ┌┴────────────────┐
+│ Claude       │ │ Completion│ │ Terminal        │ │ Notification    │
+│ Monitor      │ │ Provider  │ │ (libghostty)    │ │ Coordinator     │
+│ · FileWatcher│ │ · File    │ │ · Metal render  │ │ · Desktop notif │
+│ · Pricing    │ │ · History │ │ · PTY mgmt      │ │ · Ring animation│
+│ · Transcript │ │ · Command │ │ · Keyboard/IME  │ │ · Dock badge    │
+└──────────────┘ └───────────┘ └────────┬────────┘ └─────────────────┘
                                         │
                                ┌────────┴────────┐
                                │ Shell Integration│
@@ -256,6 +289,7 @@ Tagged by component (`[Terminal]`, `[Claude]`, `[Shell]`, `[Socket]`, etc.). Aut
 - **libghostty** — Ghostty's terminal engine. Called from Swift via C API. GPU rendering with Metal.
 - **SplitTree** — Recursive immutable value type. Supports split/merge/directional navigation.
 - **Socket Server** — Bidirectional shell ↔ app communication over Unix domain socket.
+- **NotificationCoordinator** — Unified notification hub: macOS `UNUserNotificationCenter`, in-app colored ring border, Dock badge, and sidebar unread count.
 
 ## keyboard shortcuts
 
@@ -281,15 +315,40 @@ Tagged by component (`[Terminal]`, `[Claude]`, `[Shell]`, `[Socket]`, etc.). Aut
 
 | shortcut | action |
 |----------|--------|
-| `Cmd+B` | toggle sidebar |
+| `Cmd+B` | toggle left sidebar |
+| `Cmd+Shift+B` | toggle right panel |
 | `Cmd+,` | settings |
-| `Cmd++` / `Cmd+-` / `Cmd+0` | font size |
+
+### font
+
+| shortcut | action |
+|----------|--------|
+| `Cmd++` | increase font size |
+| `Cmd+-` | decrease font size |
+| `Cmd+0` | reset font size |
 
 ### claude
 
 | shortcut | action |
 |----------|--------|
 | `Cmd+Shift+C` | new Claude session |
+
+### right panel tabs
+
+| shortcut | panel |
+|----------|-------|
+| `Ctrl+1` | Processes |
+| `Ctrl+2` | System |
+| `Ctrl+3` | Git |
+| `Ctrl+4` | Scripts |
+| `Ctrl+5` | Docker |
+| `Ctrl+6` | SSH |
+| `Ctrl+7` | Snippets |
+| `Ctrl+8` | Claude Timeline + Config |
+| `Ctrl+9` | Environment |
+| `Ctrl+0` | Notifications |
+
+Pressing the same `Ctrl+N` shortcut again while that tab is active closes the panel.
 
 ## license
 
