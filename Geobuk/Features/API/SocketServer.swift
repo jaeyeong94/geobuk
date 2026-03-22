@@ -35,9 +35,7 @@ actor SocketServer {
 
     /// 세션 매니저만 지정하여 생성 (기본 소켓 경로 사용)
     init(sessionManager: SessionManager, shellStateManager: ShellStateManager? = nil) {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let geobukDir = appSupport.appendingPathComponent("Geobuk")
-        self.socketPath = geobukDir.appendingPathComponent("geobuk.sock").path
+        self.socketPath = AppPath.appSupport.appendingPathComponent("geobuk.sock").path
         self.sessionManager = sessionManager
         self.shellStateManager = shellStateManager
         GeobukLogger.info(.socket, "SocketServer init", context: ["hasShellState": "\(shellStateManager != nil)"])
@@ -45,9 +43,7 @@ actor SocketServer {
 
     /// 기본 소켓 경로를 반환하는 정적 헬퍼
     static var defaultSocketPath: String {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let geobukDir = appSupport.appendingPathComponent("Geobuk")
-        return geobukDir.appendingPathComponent("geobuk.sock").path
+        return AppPath.appSupport.appendingPathComponent("geobuk.sock").path
     }
 
     // MARK: - 시작/중지

@@ -45,12 +45,7 @@ struct PersistedState: Codable {
 final class SessionPersistence {
 
     static let defaultSavePath: String = {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first!
-        return appSupport
-            .appendingPathComponent("Geobuk")
+        return AppPath.appSupport
             .appendingPathComponent("sessions")
             .appendingPathComponent("state.json")
             .path

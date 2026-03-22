@@ -331,8 +331,12 @@ struct BlockInputBar: View {
         guard let directory else { return (nil, 0, 0) }
 
         // 브랜치명 조회
-        let branchOutput = runGit(args: ["rev-parse", "--abbrev-ref", "HEAD"], in: directory)
-        guard let rawBranch = branchOutput?.trimmingCharacters(in: .whitespacesAndNewlines),
+        let branchOutput = ProcessRunner.output(
+            "/usr/bin/git",
+            arguments: ["--no-optional-locks", "rev-parse", "--abbrev-ref", "HEAD"],
+            currentDirectory: directory
+        )
+        guard let rawBranch = branchOutput,
               !rawBranch.isEmpty,
               rawBranch != "HEAD" || true  // detached HEAD도 표시
         else {
@@ -341,7 +345,11 @@ struct BlockInputBar: View {
         let branch = rawBranch == "HEAD" ? "HEAD" : rawBranch
 
         // porcelain 상태 조회
-        let statusOutput = runGit(args: ["status", "--porcelain"], in: directory) ?? ""
+        let statusOutput = ProcessRunner.run(
+            "/usr/bin/git",
+            arguments: ["--no-optional-locks", "status", "--porcelain"],
+            currentDirectory: directory
+        ).output ?? ""
         var modified = 0
         var staged = 0
 
@@ -361,30 +369,6 @@ struct BlockInputBar: View {
         }
 
         return (branch, modified, staged)
-    }
-
-    /// `/usr/bin/git`을 지정 디렉토리에서 실행하고 표준 출력을 반환한다
-    nonisolated private static func runGit(args: [String], in directory: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["--no-optional-locks"] + args
-        process.currentDirectoryURL = URL(fileURLWithPath: directory)
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()  // stderr 무시
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            return nil
-        }
-
-        guard process.terminationStatus == 0 else { return nil }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)
     }
 
     // MARK: - Actions

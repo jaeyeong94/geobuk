@@ -26,10 +26,7 @@ final class SnippetStore {
     var snippets: [CommandSnippet] = []
 
     private static let storageURL: URL = {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let dir = appSupport.appendingPathComponent("Geobuk", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("snippets.json")
+        return AppPath.appSupport.appendingPathComponent("snippets.json")
     }()
 
     init() {

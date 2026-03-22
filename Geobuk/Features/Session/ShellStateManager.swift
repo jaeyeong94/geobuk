@@ -135,27 +135,9 @@ extension ShellStateManager {
         cachedListeningPorts = results
     }
 
-    /// 외부 명령을 실행하고 stdout 출력을 반환한다
-    nonisolated static func runCommand(executable: String, arguments: [String]) -> String? {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: executable)
-        task.arguments = arguments
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-        } catch { return nil }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)
-    }
-
     /// TTY에서 실행 중인 프로세스 조회 (ps -t)
     nonisolated static func processesOnTTY(_ ttyName: String) -> [ProcInfo] {
-        guard let output = runCommand(executable: "/bin/ps", arguments: ["-t", ttyName, "-o", "pid=,comm="]) else {
+        guard let output = ProcessRunner.run("/bin/ps", arguments: ["-t", ttyName, "-o", "pid=,comm="]).output else {
             return []
         }
         return parsePsOutput(output)
@@ -182,7 +164,7 @@ extension ShellStateManager {
         guard !pids.isEmpty else { return [] }
         let pidList = pids.map { String($0) }.joined(separator: ",")
 
-        guard let output = runCommand(executable: "/usr/sbin/lsof", arguments: ["-nP", "-a", "-p", pidList, "-iTCP", "-sTCP:LISTEN", "-Fn"]) else {
+        guard let output = ProcessRunner.run("/usr/sbin/lsof", arguments: ["-nP", "-a", "-p", pidList, "-iTCP", "-sTCP:LISTEN", "-Fn"]).output else {
             return []
         }
 

@@ -87,9 +87,11 @@ struct ProcessPanelView: View {
                                 .font(.system(size: 11, weight: .medium, design: .monospaced))
                                 .foregroundColor(memoryColor(proc.memoryMB))
                             if !proc.listeningPorts.isEmpty {
-                                Text(verbatim: ":\(proc.listeningPorts.first!)")
+                                if let firstPort = proc.listeningPorts.first {
+                                Text(verbatim: ":\(firstPort)")
                                     .font(.system(size: 10, design: .monospaced))
                                     .foregroundColor(.blue)
+                            }
                             }
                         }
                     }

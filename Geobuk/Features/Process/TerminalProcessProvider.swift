@@ -43,7 +43,6 @@ final class TerminalProcessProvider {
 
     func startMonitoring() {
         guard pollingTask == nil else { return }
-        print("[TerminalProcessProvider] startMonitoring called")
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
@@ -51,7 +50,6 @@ final class TerminalProcessProvider {
                     TerminalProcessProvider.fetchTerminalProcesses()
                 }.value
                 self.processes = result
-                print("[TerminalProcessProvider] fetched \(result.count) processes")
                 try? await Task.sleep(for: .seconds(Self.pollingInterval))
             }
         }
@@ -89,12 +87,10 @@ final class TerminalProcessProvider {
 
     /// TTY 보유 프로세스를 수집한다 (nonisolated, 백그라운드 호출 가능)
     nonisolated static func fetchTerminalProcesses() -> [TerminalProcess] {
-        print("[TerminalProcessProvider] fetchTerminalProcesses start")
-        let psOutput = runCommand(
-            executable: "/bin/ps",
+        let psOutput = ProcessRunner.run(
+            "/bin/ps",
             arguments: ["-eo", "pid,tty,pcpu,rss,etime,args"]
-        )
-        print("[TerminalProcessProvider] ps output: \(psOutput == nil ? "nil" : "\(psOutput!.count) chars")")
+        ).output
         guard let psOutput else { return [] }
 
         let portMap = fetchListeningPortMap()
@@ -151,10 +147,10 @@ final class TerminalProcessProvider {
 
     /// PID → 리스닝 포트 맵을 구축한다
     nonisolated private static func fetchListeningPortMap() -> [pid_t: [UInt16]] {
-        let output = runCommand(
-            executable: "/usr/sbin/lsof",
+        let output = ProcessRunner.run(
+            "/usr/sbin/lsof",
             arguments: ["-nP", "-iTCP", "-sTCP:LISTEN", "-Fpn"]
-        )
+        ).output
         guard let output else { return [:] }
         return parseLsofForPortMap(output)
     }
@@ -214,22 +210,4 @@ final class TerminalProcessProvider {
         }
     }
 
-    /// 외부 명령 실행
-    nonisolated private static func runCommand(executable: String, arguments: [String]) -> String? {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: executable)
-        task.arguments = arguments
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-
-        do {
-            try task.run()
-        } catch { return nil }
-
-        // readDataToEndOfFile을 먼저 호출 (파이프 버퍼가 차면 waitUntilExit가 교착)
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        task.waitUntilExit()
-        return String(data: data, encoding: .utf8)
-    }
 }

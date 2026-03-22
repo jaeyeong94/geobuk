@@ -547,30 +547,12 @@ struct GitPanelView: View {
     // MARK: - Git Command Helpers (nonisolated)
 
     nonisolated static func runGit(args: [String], in directory: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["--no-optional-locks"] + args
-        process.currentDirectoryURL = URL(fileURLWithPath: directory)
-
-        // Suppress output to avoid interfering with the terminal
-        process.environment = ProcessInfo.processInfo.environment.merging(["GIT_TERMINAL_PROMPT": "0"]) { _, new in new }
-
-        let pipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = errorPipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            return nil
-        }
-
-        guard process.terminationStatus == 0 else { return nil }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)
+        ProcessRunner.output(
+            "/usr/bin/git",
+            arguments: ["--no-optional-locks"] + args,
+            currentDirectory: directory,
+            environment: ["GIT_TERMINAL_PROMPT": "0"]
+        )
     }
 
     /// Runs `gh pr list` and returns parsed PRs or an error string.

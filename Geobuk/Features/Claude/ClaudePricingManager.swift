@@ -13,10 +13,7 @@ final class ClaudePricingManager {
 
     /// 캐시 파일 경로
     private static let cachePath: String = {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("Geobuk")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("pricing.json").path
+        return AppPath.appSupport.appendingPathComponent("pricing.json").path
     }()
 
     init() {

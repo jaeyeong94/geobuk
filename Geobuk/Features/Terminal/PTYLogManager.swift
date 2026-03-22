@@ -6,11 +6,7 @@ import Foundation
 final class PTYLogManager {
     /// 로그 디렉토리
     static let logDirectory: String = {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first!
-        return appSupport.appendingPathComponent("Geobuk/pty-logs").path
+        return AppPath.appSupport.appendingPathComponent("pty-logs").path
     }()
 
     /// 패널 ID별 로그 파일 경로

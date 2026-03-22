@@ -33,10 +33,7 @@ final class GeobukLogger: Sendable {
     private let queue = DispatchQueue(label: "com.geobuk.logger", qos: .utility)
 
     private init() {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("Geobuk")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        self.logPath = dir.appendingPathComponent("geobuk.log").path
+        self.logPath = AppPath.appSupport.appendingPathComponent("geobuk.log").path
     }
 
     // MARK: - Public API
