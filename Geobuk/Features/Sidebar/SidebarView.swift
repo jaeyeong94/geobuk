@@ -322,7 +322,7 @@ struct SidebarView: View {
                             .foregroundColor(.orange)
                     }
                     if let durationMs = claudeMonitor?.sessionTurnDurations[session.sessionId] {
-                        Text(formatDuration(durationMs))
+                        Text(SessionFormatter.formatDuration(durationMs))
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundColor(.secondary)
                     }
@@ -378,17 +378,6 @@ struct SidebarView: View {
         case .sessionComplete: return "Complete"
         case .idle: return "Idle"
         }
-    }
-
-    /// 밀리초를 읽기 쉽게 포맷 (12345 → "12.3s", 65432 → "1m 5s")
-    private func formatDuration(_ ms: Int) -> String {
-        let seconds = Double(ms) / 1000.0
-        if seconds < 60 {
-            return String(format: "%.1fs", seconds)
-        }
-        let minutes = Int(seconds) / 60
-        let secs = Int(seconds) % 60
-        return "\(minutes)m \(secs)s"
     }
 
     // MARK: - Claude Session Section
@@ -481,14 +470,14 @@ struct SidebarView: View {
                 Text("↓")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(.green)
-                Text(formatBytes(monitor.networkBytesIn))
+                Text(SessionFormatter.formatBytes(monitor.networkBytesIn))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.secondary)
 
                 Text("↑")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(.blue)
-                Text(formatBytes(monitor.networkBytesOut))
+                Text(SessionFormatter.formatBytes(monitor.networkBytesOut))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.secondary)
 
@@ -504,15 +493,6 @@ struct SidebarView: View {
         return Int(Double(monitor.memoryUsed) / Double(monitor.memoryTotal) * 100)
     }
 
-    private func formatBytes(_ bytesPerSec: UInt64) -> String {
-        if bytesPerSec >= 1_048_576 {
-            return String(format: "%.1f MB/s", Double(bytesPerSec) / 1_048_576)
-        } else if bytesPerSec >= 1024 {
-            return String(format: "%.0f KB/s", Double(bytesPerSec) / 1024)
-        } else {
-            return "\(bytesPerSec) B/s"
-        }
-    }
 }
 
 // MARK: - Workspace Tab

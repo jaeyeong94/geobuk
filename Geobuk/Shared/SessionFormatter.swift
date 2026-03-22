@@ -49,4 +49,26 @@ enum SessionFormatter {
             return "\(seconds)s"
         }
     }
+
+    /// bytes/sec를 읽기 쉽게 포맷 (1048576 → "1.0 MB/s")
+    static func formatBytes(_ bytesPerSec: UInt64) -> String {
+        if bytesPerSec >= 1_048_576 { return String(format: "%.1f MB/s", Double(bytesPerSec) / 1_048_576) }
+        if bytesPerSec >= 1024 { return String(format: "%.0f KB/s", Double(bytesPerSec) / 1024) }
+        return "\(bytesPerSec) B/s"
+    }
+
+    /// MB를 읽기 쉽게 포맷 (2048 → "2.0 GB")
+    static func formatMB(_ mb: UInt64) -> String {
+        if mb >= 1024 { return String(format: "%.1f GB", Double(mb) / 1024.0) }
+        return "\(mb) MB"
+    }
+
+    /// 밀리초를 읽기 쉽게 포맷 (65432 → "1m 5s")
+    static func formatDuration(_ ms: Int) -> String {
+        let seconds = Double(ms) / 1000.0
+        if seconds < 60 { return String(format: "%.1fs", seconds) }
+        let minutes = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return "\(minutes)m \(secs)s"
+    }
 }

@@ -80,7 +80,7 @@ struct GitPanelView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         // Branch Info 섹션
-                        collapsibleSection(
+                        CollapsibleSectionView(
                             title: "Branch Info",
                             systemImage: "arrow.triangle.branch",
                             isExpanded: $branchSectionExpanded
@@ -91,7 +91,7 @@ struct GitPanelView: View {
                         Divider().padding(.horizontal, 12)
 
                         // Changed Files 섹션
-                        collapsibleSection(
+                        CollapsibleSectionView(
                             title: "Changed Files",
                             systemImage: "doc.badge.ellipsis",
                             isExpanded: $changesSectionExpanded,
@@ -103,7 +103,7 @@ struct GitPanelView: View {
                         Divider().padding(.horizontal, 12)
 
                         // Pull Requests 섹션
-                        collapsibleSection(
+                        CollapsibleSectionView(
                             title: "Pull Requests",
                             systemImage: "arrow.triangle.merge",
                             isExpanded: $prSectionExpanded,
@@ -115,7 +115,7 @@ struct GitPanelView: View {
                         Divider().padding(.horizontal, 12)
 
                         // Recent Commits 섹션
-                        collapsibleSection(
+                        CollapsibleSectionView(
                             title: "Recent Commits",
                             systemImage: "clock.arrow.circlepath",
                             isExpanded: $commitsSectionExpanded
@@ -126,7 +126,7 @@ struct GitPanelView: View {
                         Divider().padding(.horizontal, 12)
 
                         // Branch Graph 섹션
-                        collapsibleSection(
+                        CollapsibleSectionView(
                             title: "Branch Graph",
                             systemImage: "point.3.connected.trianglepath.dotted",
                             isExpanded: $graphSectionExpanded
@@ -400,55 +400,6 @@ struct GitPanelView: View {
         .padding(.vertical, 2)
     }
 
-    // MARK: - Collapsible Section
-
-    @ViewBuilder
-    private func collapsibleSection<Content: View>(
-        title: String,
-        systemImage: String,
-        isExpanded: Binding<Bool>,
-        badge: String? = nil,
-        @ViewBuilder content: @escaping () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button(action: { withAnimation(.easeInOut(duration: 0.15)) { isExpanded.wrappedValue.toggle() } }) {
-                HStack(spacing: 4) {
-                    Image(systemName: systemImage)
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-
-                    Text(title)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-
-                    if let badge = badge {
-                        Text(badge)
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.secondary.opacity(0.5))
-                            .cornerRadius(4)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: isExpanded.wrappedValue ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.secondary.opacity(0.7))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if isExpanded.wrappedValue {
-                content()
-            }
-        }
-    }
-
     // MARK: - Data Loading
 
     private func refresh() {
@@ -547,12 +498,7 @@ struct GitPanelView: View {
     // MARK: - Git Command Helpers (nonisolated)
 
     nonisolated static func runGit(args: [String], in directory: String) -> String? {
-        ProcessRunner.output(
-            "/usr/bin/git",
-            arguments: ["--no-optional-locks"] + args,
-            currentDirectory: directory,
-            environment: ["GIT_TERMINAL_PROMPT": "0"]
-        )
+        GitRunner.run(args: args, in: directory)
     }
 
     /// Runs `gh pr list` and returns parsed PRs or an error string.

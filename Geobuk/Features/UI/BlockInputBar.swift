@@ -331,11 +331,7 @@ struct BlockInputBar: View {
         guard let directory else { return (nil, 0, 0) }
 
         // 브랜치명 조회
-        let branchOutput = ProcessRunner.output(
-            "/usr/bin/git",
-            arguments: ["--no-optional-locks", "rev-parse", "--abbrev-ref", "HEAD"],
-            currentDirectory: directory
-        )
+        let branchOutput = GitRunner.run(args: ["rev-parse", "--abbrev-ref", "HEAD"], in: directory)
         guard let rawBranch = branchOutput,
               !rawBranch.isEmpty,
               rawBranch != "HEAD" || true  // detached HEAD도 표시
@@ -345,11 +341,7 @@ struct BlockInputBar: View {
         let branch = rawBranch == "HEAD" ? "HEAD" : rawBranch
 
         // porcelain 상태 조회
-        let statusOutput = ProcessRunner.run(
-            "/usr/bin/git",
-            arguments: ["--no-optional-locks", "status", "--porcelain"],
-            currentDirectory: directory
-        ).output ?? ""
+        let statusOutput = GitRunner.runWithStatus(args: ["status", "--porcelain"], in: directory).output ?? ""
         var modified = 0
         var staged = 0
 

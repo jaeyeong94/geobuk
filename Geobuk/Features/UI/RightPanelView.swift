@@ -61,7 +61,7 @@ struct ProcessPanelView: View {
                         HStack(spacing: 4) {
                             Text(String(format: "%.1f%%", proc.cpuPercent))
                                 .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                .foregroundColor(cpuColor(proc.cpuPercent))
+                                .foregroundColor(ColorHelpers.cpuColor(proc.cpuPercent))
                             Text(proc.formattedUptime)
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundColor(.secondary)
@@ -83,9 +83,9 @@ struct ProcessPanelView: View {
                 ForEach(Array(items)) { proc in
                     processRow(proc) {
                         HStack(spacing: 4) {
-                            Text(formatMemory(proc.memoryMB))
+                            Text(SessionFormatter.formatMB(proc.memoryMB))
                                 .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                .foregroundColor(memoryColor(proc.memoryMB))
+                                .foregroundColor(ColorHelpers.memoryColor(proc.memoryMB))
                             if !proc.listeningPorts.isEmpty {
                                 if let firstPort = proc.listeningPorts.first {
                                 Text(verbatim: ":\(firstPort)")
@@ -278,23 +278,6 @@ struct ProcessPanelView: View {
     }
 
     // MARK: - Helpers
-
-    private func cpuColor(_ percent: Double) -> Color {
-        if percent >= 50 { return .red }
-        if percent >= 20 { return .orange }
-        return .green
-    }
-
-    private func memoryColor(_ mb: UInt64) -> Color {
-        if mb >= 512 { return .red }
-        if mb >= 256 { return .orange }
-        return .primary
-    }
-
-    private func formatMemory(_ mb: UInt64) -> String {
-        if mb >= 1024 { return String(format: "%.1f GB", Double(mb) / 1024.0) }
-        return "\(mb) MB"
-    }
 
     private func openInBrowser(port: UInt16) {
         let url = URL(string: "http://localhost:\(port)")!

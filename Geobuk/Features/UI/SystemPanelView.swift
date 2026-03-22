@@ -63,7 +63,7 @@ struct SystemPanelView: View {
                             title: "Top Memory",
                             systemImage: "memorychip",
                             processes: Array(monitor.topProcessesByMemory.prefix(5)),
-                            valueFormatter: { formatMB($0.memoryMB) },
+                            valueFormatter: { SessionFormatter.formatMB($0.memoryMB) },
                             valueColor: { memColor($0.memoryMB) }
                         )
 
@@ -163,7 +163,7 @@ struct SystemPanelView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
                     Spacer()
-                    Text(verbatim: "\(formatMB(monitor.memoryUsed)) / \(formatMB(monitor.memoryTotal))")
+                    Text(verbatim: "\(SessionFormatter.formatMB(monitor.memoryUsed)) / \(SessionFormatter.formatMB(monitor.memoryTotal))")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
                 }
@@ -176,11 +176,11 @@ struct SystemPanelView: View {
 
                     HStack(spacing: 0) {
                         Rectangle().fill(Color.green).frame(width: activeW)
-                            .help("Active: \(formatMB(monitor.memoryActive))")
+                            .help("Active: \(SessionFormatter.formatMB(monitor.memoryActive))")
                         Rectangle().fill(Color.blue).frame(width: wiredW)
-                            .help("Wired: \(formatMB(monitor.memoryWired))")
+                            .help("Wired: \(SessionFormatter.formatMB(monitor.memoryWired))")
                         Rectangle().fill(Color.orange).frame(width: compressedW)
-                            .help("Compressed: \(formatMB(monitor.memoryCompressed))")
+                            .help("Compressed: \(SessionFormatter.formatMB(monitor.memoryCompressed))")
                         Rectangle().fill(Color.gray.opacity(0.2))
                     }
                     .cornerRadius(3)
@@ -207,7 +207,7 @@ struct SystemPanelView: View {
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.secondary)
                         Spacer()
-                        Text(verbatim: "\(formatMB(monitor.swapUsed)) / \(formatMB(monitor.swapTotal))")
+                        Text(verbatim: "\(SessionFormatter.formatMB(monitor.swapUsed)) / \(SessionFormatter.formatMB(monitor.swapTotal))")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(monitor.swapUsed > 0 ? .orange : .secondary)
                     }
@@ -350,13 +350,13 @@ struct SystemPanelView: View {
             HStack {
                 HStack(spacing: 3) {
                     Circle().fill(Color.green).frame(width: 6, height: 6)
-                    Text("↓ \(formatBytes(monitor.networkBytesIn))")
+                    Text("↓ \(SessionFormatter.formatBytes(monitor.networkBytesIn))")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
                 }
                 Spacer()
                 HStack(spacing: 3) {
-                    Text("↑ \(formatBytes(monitor.networkBytesOut))")
+                    Text("↑ \(SessionFormatter.formatBytes(monitor.networkBytesOut))")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
                     Circle().fill(Color.blue).frame(width: 6, height: 6)
@@ -523,17 +523,6 @@ struct SystemPanelView: View {
         if ratio > 0.7 { return .red }
         if ratio > 0.3 { return .orange }
         return .yellow
-    }
-
-    private func formatMB(_ mb: UInt64) -> String {
-        if mb >= 1024 { return String(format: "%.1f GB", Double(mb) / 1024.0) }
-        return "\(mb) MB"
-    }
-
-    private func formatBytes(_ bytesPerSec: UInt64) -> String {
-        if bytesPerSec >= 1_048_576 { return String(format: "%.1f MB/s", Double(bytesPerSec) / 1_048_576) }
-        if bytesPerSec >= 1024 { return String(format: "%.0f KB/s", Double(bytesPerSec) / 1024) }
-        return "\(bytesPerSec) B/s"
     }
 
     private func cpuColor(_ score: Double) -> Color {
