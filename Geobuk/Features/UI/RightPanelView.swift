@@ -51,7 +51,14 @@ struct ProcessPanelView: View {
     // MARK: - CPU Section
 
     private var cpuSection: some View {
-        collapsibleSection(key: "cpu", title: "CPU", systemImage: "cpu") {
+        CollapsibleSectionView(
+            title: "CPU",
+            systemImage: "cpu",
+            isExpanded: Binding(
+                get: { expandedSections.contains("cpu") },
+                set: { if $0 { expandedSections.insert("cpu") } else { expandedSections.remove("cpu") } }
+            )
+        ) {
             let items = provider.topByCPU.prefix(Self.maxItemsPerSection)
             if items.isEmpty {
                 emptyLabel("No active processes")
@@ -75,7 +82,14 @@ struct ProcessPanelView: View {
     // MARK: - Memory Section
 
     private var memorySection: some View {
-        collapsibleSection(key: "memory", title: "Memory", systemImage: "memorychip") {
+        CollapsibleSectionView(
+            title: "Memory",
+            systemImage: "memorychip",
+            isExpanded: Binding(
+                get: { expandedSections.contains("memory") },
+                set: { if $0 { expandedSections.insert("memory") } else { expandedSections.remove("memory") } }
+            )
+        ) {
             let items = provider.topByMemory.prefix(Self.maxItemsPerSection)
             if items.isEmpty {
                 emptyLabel("No active processes")
@@ -103,7 +117,14 @@ struct ProcessPanelView: View {
     // MARK: - Ports Section
 
     private var portsSection: some View {
-        collapsibleSection(key: "ports", title: "Ports", systemImage: "network") {
+        CollapsibleSectionView(
+            title: "Ports",
+            systemImage: "network",
+            isExpanded: Binding(
+                get: { expandedSections.contains("ports") },
+                set: { if $0 { expandedSections.insert("ports") } else { expandedSections.remove("ports") } }
+            )
+        ) {
             let items = provider.withPorts
             if items.isEmpty {
                 emptyLabel("No listening ports")
@@ -142,7 +163,14 @@ struct ProcessPanelView: View {
     // MARK: - Running Commands Section
 
     private var runningSection: some View {
-        collapsibleSection(key: "running", title: "Long Running", systemImage: "clock") {
+        CollapsibleSectionView(
+            title: "Long Running",
+            systemImage: "clock",
+            isExpanded: Binding(
+                get: { expandedSections.contains("running") },
+                set: { if $0 { expandedSections.insert("running") } else { expandedSections.remove("running") } }
+            )
+        ) {
             let items = provider.longRunning.prefix(Self.maxItemsPerSection)
             if items.isEmpty {
                 emptyLabel("No long-running processes")
@@ -180,50 +208,6 @@ struct ProcessPanelView: View {
     }
 
     // MARK: - Reusable Components
-
-    @ViewBuilder
-    private func collapsibleSection<Content: View>(
-        key: String,
-        title: String,
-        systemImage: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    if expandedSections.contains(key) {
-                        expandedSections.remove(key)
-                    } else {
-                        expandedSections.insert(key)
-                    }
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: expandedSections.contains(key) ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
-                        .frame(width: 10)
-
-                    Image(systemName: systemImage)
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-
-                    Text(title)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-            }
-            .buttonStyle(.plain)
-
-            if expandedSections.contains(key) {
-                content()
-            }
-        }
-    }
 
     @ViewBuilder
     private func processRow<Trailing: View>(

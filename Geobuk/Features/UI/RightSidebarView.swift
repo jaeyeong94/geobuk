@@ -11,6 +11,7 @@ enum RightPanelTab: String, CaseIterable, Identifiable {
     case snippets = "Snippets"
     case claude = "Claude"
     case environment = "Environment"
+    case notifications = "Notifications"
 
     var id: String { rawValue }
 
@@ -25,6 +26,7 @@ enum RightPanelTab: String, CaseIterable, Identifiable {
         case .snippets: return "bookmark"
         case .claude: return "brain"
         case .environment: return "list.bullet.rectangle"
+        case .notifications: return "bell"
         }
     }
 
@@ -39,10 +41,11 @@ enum RightPanelTab: String, CaseIterable, Identifiable {
         case .snippets: return "Snippets (Ctrl+7)"
         case .claude: return "Claude Timeline (Ctrl+8)"
         case .environment: return "Environment (Ctrl+9)"
+        case .notifications: return "Notifications (Ctrl+0)"
         }
     }
 
-    /// 탭 번호 (1-based)
+    /// 탭 번호 (1-based; notifications uses 0)
     var number: Int {
         switch self {
         case .processes: return 1
@@ -54,6 +57,7 @@ enum RightPanelTab: String, CaseIterable, Identifiable {
         case .snippets: return 7
         case .claude: return 8
         case .environment: return 9
+        case .notifications: return 0
         }
     }
 
@@ -71,6 +75,7 @@ struct RightSidebarView: View {
     var claudeMonitor: ClaudeSessionMonitor?
     var claudeFileWatcher: ClaudeSessionFileWatcher?
     var currentDirectory: String?
+    var notificationCoordinator: NotificationCoordinator?
     /// 패널 포커스 전환 시 증가하여 Git 등 패널 강제 갱신
     var refreshTrigger: Int = 0
     var onClose: (() -> Void)?
@@ -112,6 +117,16 @@ struct RightSidebarView: View {
                                     : Color.clear
                             )
                             .cornerRadius(8)
+                            .overlay(alignment: .topTrailing) {
+                                if tab == .notifications,
+                                   let unread = notificationCoordinator?.unreadCount,
+                                   unread > 0 {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 2, y: -2)
+                                }
+                            }
 
                         Text(verbatim: "\(tab.number)")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -165,6 +180,8 @@ struct RightSidebarView: View {
             ClaudeTimelinePanelView(claudeMonitor: claudeMonitor, claudeFileWatcher: claudeFileWatcher)
         case .environment:
             EnvironmentPanelView(surfaceView: surfaceView)
+        case .notifications:
+            NotificationPanelView(coordinator: notificationCoordinator)
         }
     }
 }

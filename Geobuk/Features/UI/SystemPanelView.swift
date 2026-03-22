@@ -55,7 +55,7 @@ struct SystemPanelView: View {
                             systemImage: "cpu",
                             processes: Array(monitor.topProcessesByCPU.prefix(5)),
                             valueFormatter: { String(format: "%.1fs", $0.cpuPercent) },
-                            valueColor: { cpuColor($0.cpuPercent) }
+                            valueColor: { ColorHelpers.cpuColor($0.cpuPercent) }
                         )
 
                         // Top Memory 프로세스
@@ -64,7 +64,7 @@ struct SystemPanelView: View {
                             systemImage: "memorychip",
                             processes: Array(monitor.topProcessesByMemory.prefix(5)),
                             valueFormatter: { SessionFormatter.formatMB($0.memoryMB) },
-                            valueColor: { memColor($0.memoryMB) }
+                            valueColor: { ColorHelpers.memoryColor($0.memoryMB) }
                         )
 
                         // 리스닝 포트
@@ -104,7 +104,7 @@ struct SystemPanelView: View {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: columns), spacing: 3) {
                 ForEach(0..<monitor.perCoreUsage.count, id: \.self) { i in
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(coreColor(usage: monitor.perCoreUsage[i]))
+                        .fill(ColorHelpers.coreColor(usage: monitor.perCoreUsage[i]))
                         .frame(height: 14)
                         .help("Core \(i): \(Int(monitor.perCoreUsage[i] * 100))%")
                 }
@@ -136,7 +136,7 @@ struct SystemPanelView: View {
                 let fillW = geo.size.width * monitor.gpuUtilization
                 HStack(spacing: 0) {
                     Rectangle()
-                        .fill(coreColor(usage: monitor.gpuUtilization))
+                        .fill(ColorHelpers.coreColor(usage: monitor.gpuUtilization))
                         .frame(width: fillW)
                     Rectangle()
                         .fill(Color.gray.opacity(0.2))
@@ -217,7 +217,7 @@ struct SystemPanelView: View {
                         let usedW = geo.size.width * Double(monitor.swapUsed) / total
 
                         HStack(spacing: 0) {
-                            Rectangle().fill(swapColor(used: monitor.swapUsed, total: monitor.swapTotal))
+                            Rectangle().fill(ColorHelpers.swapColor(used: monitor.swapUsed, total: monitor.swapTotal))
                                 .frame(width: usedW)
                             Rectangle().fill(Color.gray.opacity(0.2))
                         }
@@ -271,7 +271,7 @@ struct SystemPanelView: View {
                 let fillW = geo.size.width * ratio
                 HStack(spacing: 0) {
                     Rectangle()
-                        .fill(diskColor(ratio: ratio))
+                        .fill(ColorHelpers.diskColor(ratio: ratio))
                         .frame(width: fillW)
                     Rectangle()
                         .fill(Color.gray.opacity(0.2))
@@ -497,43 +497,10 @@ struct SystemPanelView: View {
 
     // MARK: - Helpers
 
-    private func coreColor(usage: Double) -> Color {
-        let clamped = min(max(usage, 0), 1)
-        let red = min(clamped * 2, 1.0)
-        let green = min((1 - clamped) * 2, 1.0)
-        return Color(red: red, green: green, blue: 0).opacity(max(clamped, 0.15))
-    }
-
-    private func diskColor(ratio: Double) -> Color {
-        if ratio > 0.85 { return .red }
-        if ratio > 0.6 { return .yellow }
-        return .green
-    }
-
     private func legendDot(color: Color, label: String) -> some View {
         HStack(spacing: 3) {
             Circle().fill(color).frame(width: 6, height: 6)
             Text(label)
         }
-    }
-
-    private func swapColor(used: UInt64, total: UInt64) -> Color {
-        guard total > 0 else { return .gray }
-        let ratio = Double(used) / Double(total)
-        if ratio > 0.7 { return .red }
-        if ratio > 0.3 { return .orange }
-        return .yellow
-    }
-
-    private func cpuColor(_ score: Double) -> Color {
-        if score >= 50 { return .red }
-        if score >= 10 { return .orange }
-        return .green
-    }
-
-    private func memColor(_ mb: UInt64) -> Color {
-        if mb >= 512 { return .red }
-        if mb >= 256 { return .orange }
-        return .primary
     }
 }

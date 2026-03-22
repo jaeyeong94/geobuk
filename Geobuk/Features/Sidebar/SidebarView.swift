@@ -8,6 +8,7 @@ struct SidebarView: View {
     var processMonitor: PaneProcessMonitor?
     var shellStateManager: ShellStateManager?
     var systemMonitor: SystemMonitor?
+    var notificationCoordinator: NotificationCoordinator?
     var surfaceViews: [UUID: GhosttySurfaceView] = [:]
     var onWorkspaceSwitch: (() -> Void)?
     var onCreateWorkspace: (() -> Void)?
@@ -76,6 +77,7 @@ struct SidebarView: View {
                                 isActive: isActive,
                                 isEditing: editingIndex == index,
                                 claudeSessionCount: isActive ? 0 : (processMonitor?.claudeSessionCount(for: workspace) ?? 0),
+                                unreadCount: notificationCoordinator?.unreadCount ?? 0,
                                 editingName: $editingName,
                                 onSelect: {
                                     workspaceManager.switchToWorkspace(at: index)
@@ -508,6 +510,7 @@ struct WorkspaceTabView: View {
     var totalCost: Double = 0
     var activeProcessName: String? = nil
     var listeningPorts: [UInt16] = []
+    var unreadCount: Int = 0
     @Binding var editingName: String
     let onSelect: () -> Void
     let onBeginRename: () -> Void
@@ -550,6 +553,17 @@ struct WorkspaceTabView: View {
                             .font(.system(size: 13, weight: isActive ? .semibold : .regular))
                             .lineLimit(1)
                             .truncationMode(.tail)
+                            .overlay(alignment: .topTrailing) {
+                                if unreadCount > 0 {
+                                    Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 2)
+                                        .background(Capsule().fill(Color.red))
+                                        .offset(x: 6, y: -6)
+                                }
+                            }
 
                         // 활성 워크스페이스: 경로를 같은 줄에 표시
                         if isActive {

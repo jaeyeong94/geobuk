@@ -6,6 +6,7 @@ struct SplitContainerView: View {
     let focusedPaneId: UUID?
     let onFocusPane: (UUID) -> Void
     let surfaceViewProvider: (UUID) -> GhosttySurfaceView?
+    var notificationCoordinator: NotificationCoordinator?
 
     var body: some View {
         switch node {
@@ -14,7 +15,8 @@ struct SplitContainerView: View {
                 content: content,
                 isFocused: content.id == focusedPaneId,
                 onTap: { onFocusPane(content.id) },
-                surfaceViewProvider: surfaceViewProvider
+                surfaceViewProvider: surfaceViewProvider,
+                notificationCoordinator: notificationCoordinator
             )
 
         case .split(let container):
@@ -27,7 +29,8 @@ struct SplitContainerView: View {
                         node: container.first,
                         focusedPaneId: focusedPaneId,
                         onFocusPane: onFocusPane,
-                        surfaceViewProvider: surfaceViewProvider
+                        surfaceViewProvider: surfaceViewProvider,
+                        notificationCoordinator: notificationCoordinator
                     )
                 },
                 second: {
@@ -35,7 +38,8 @@ struct SplitContainerView: View {
                         node: container.second,
                         focusedPaneId: focusedPaneId,
                         onFocusPane: onFocusPane,
-                        surfaceViewProvider: surfaceViewProvider
+                        surfaceViewProvider: surfaceViewProvider,
+                        notificationCoordinator: notificationCoordinator
                     )
                 }
             )
@@ -50,6 +54,7 @@ struct SplitPaneView: View {
     let isFocused: Bool
     let onTap: () -> Void
     let surfaceViewProvider: (UUID) -> GhosttySurfaceView?
+    var notificationCoordinator: NotificationCoordinator?
 
     /// 셸 초기화 오버레이 표시 여부
     @State private var showInitOverlay = true
@@ -62,6 +67,82 @@ struct SplitPaneView: View {
 
     /// 현재 작업 디렉토리 (surfaceView.currentDirectory를 SwiftUI에서 추적)
     @State private var currentDir: String? = nil
+
+    /// 알림 링 투명도 (애니메이션용)
+    @State private var ringOpacity: Double = 0
+
+    /// 현재 알림 링 색상
+    @State private var ringColor: Color = .clear
+
+    /// 링 페이드아웃 태스크 (자동 해제용)
+    @State private var ringDismissTask: Task<Void, Never>? = nil
+
+    /// 알림 링 색상 매핑
+    private func color(for alertType: PaneAlertType) -> Color {
+        switch alertType {
+        case .permissionRequest: return .red
+        case .sessionComplete: return .green
+        case .commandComplete: return .blue
+        case .error: return .yellow
+        }
+    }
+
+    /// surfaceId 문자열 (이 패널의 식별자)
+    private var surfaceId: String? {
+        guard case .terminal = content,
+              let surfaceView = surfaceViewProvider(content.id) else { return nil }
+        return surfaceView.viewId.uuidString
+    }
+
+    /// 알림 링 애니메이션 시작
+    private func startRingAnimation(for alertType: PaneAlertType) {
+        ringDismissTask?.cancel()
+        ringColor = color(for: alertType)
+
+        switch alertType {
+        case .permissionRequest:
+            // 펄싱 애니메이션: 0→1→0 반복
+            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                ringOpacity = 1.0
+            }
+
+        case .sessionComplete:
+            // 3초 후 페이드아웃
+            withAnimation(.easeIn(duration: 0.2)) { ringOpacity = 1.0 }
+            ringDismissTask = Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.4)) { ringOpacity = 0 }
+            }
+
+        case .commandComplete:
+            // 2초 후 페이드아웃
+            withAnimation(.easeIn(duration: 0.2)) { ringOpacity = 1.0 }
+            ringDismissTask = Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.4)) { ringOpacity = 0 }
+            }
+
+        case .error:
+            // 3초 후 페이드아웃
+            withAnimation(.easeIn(duration: 0.2)) { ringOpacity = 1.0 }
+            ringDismissTask = Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.4)) { ringOpacity = 0 }
+            }
+        }
+    }
+
+    /// 알림 링 즉시 해제
+    private func dismissRing() {
+        ringDismissTask?.cancel()
+        ringDismissTask = nil
+        withAnimation(.easeOut(duration: 0.2)) {
+            ringOpacity = 0
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -168,6 +249,11 @@ struct SplitPaneView: View {
             }
         }
         .border(isFocused ? Color.blue.opacity(0.6) : Color.gray.opacity(0.2), width: 1)
+        .overlay(
+            RoundedRectangle(cornerRadius: 2)
+                .strokeBorder(ringColor, lineWidth: 2)
+                .opacity(ringOpacity)
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
@@ -178,6 +264,38 @@ struct SplitPaneView: View {
                     inputFocusTrigger.toggle()
                 }
             }
+        }
+        .onChange(of: isFocused) { _, focused in
+            if focused, let sid = surfaceId {
+                notificationCoordinator?.markAllAsRead(source: sid)
+                dismissRing()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .geobukNotificationPosted)) { notification in
+            guard let geobukNotification = notification.object as? GeobukNotification,
+                  let sid = surfaceId,
+                  geobukNotification.source.contains(sid) else { return }
+
+            // 포커스 중이면 링을 표시하지 않고 즉시 읽음 처리
+            if isFocused {
+                notificationCoordinator?.markAllAsRead(source: sid)
+                return
+            }
+
+            // 알림 타입 결정 및 링 애니메이션 시작
+            let alertType: PaneAlertType = {
+                if let coordinator = notificationCoordinator,
+                   let type = coordinator.alertColor(for: sid) {
+                    return type
+                }
+                // 코디네이터 없을 때 제목으로 추론
+                if geobukNotification.title.contains("waiting") { return .permissionRequest }
+                if geobukNotification.title.contains("complete") { return .sessionComplete }
+                if geobukNotification.title.contains("error") || geobukNotification.title.contains("Error") { return .error }
+                return .commandComplete
+            }()
+
+            startRingAnimation(for: alertType)
         }
         .onReceive(NotificationCenter.default.publisher(for: .geobukShellCommandStarted)) { notification in
             // 셸이 preexec를 보고 → 명령 시작됨

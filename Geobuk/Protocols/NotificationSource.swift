@@ -10,7 +10,7 @@ enum NotificationPriority: Sendable {
 }
 
 /// 앱 내부 알림 이벤트
-struct GeobukNotification: Sendable {
+struct GeobukNotification: Identifiable, Sendable {
     let id: UUID
     let source: String
     let title: String

@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 struct ContentView: View {
     @State private var ghosttyApp = GhosttyApp()
@@ -23,6 +24,7 @@ struct ContentView: View {
     @State private var claudeLaunchSettings = ClaudeLaunchSettings()
     @State private var pricingManager = ClaudePricingManager()
     @State private var shellStateManager = ShellStateManager()
+    @State private var notificationCoordinator = NotificationCoordinator()
     @State private var terminalProcessProvider = TerminalProcessProvider()
     @State private var isRightPanelVisible = true
     /// 우측 패널에 전달할 현재 디렉토리 (셸 프롬프트 복귀 시 갱신)
@@ -107,8 +109,27 @@ struct ContentView: View {
                     }
                 )
             }
-            .onReceive(NotificationCenter.default.publisher(for: .geobukShellPromptReady)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .geobukShellCommandStarted)) { notification in
+                if let surfaceId = notification.userInfo?["surfaceId"] as? String {
+                    notificationCoordinator.commandStarted(surfaceId: surfaceId)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .geobukShellPromptReady)) { notification in
                 updateFocusedDirectory()
+                if let surfaceId = notification.userInfo?["surfaceId"] as? String {
+                    let command = shellStateManager.shellStates[surfaceId]?.command
+                    notificationCoordinator.commandFinished(surfaceId: surfaceId, command: command)
+                }
+            }
+            .onChange(of: claudeMonitor.sessionState.phase) { _, newPhase in
+                guard let sessionId = claudeMonitor.sessionState.sessionId else { return }
+                let state = claudeMonitor.getState(for: sessionId)
+                notificationCoordinator.handleClaudeEvent(
+                    phase: newPhase,
+                    sessionId: sessionId,
+                    toolName: state?.currentToolName,
+                    costUSD: state?.costUSD ?? 0
+                )
             }
             .onReceive(NotificationCenter.default.publisher(for: .geobukPWDChanged)) { notification in
                 // PWD 변경 시 포커스된 패널의 디렉토리인지 확인 후 갱신
@@ -148,6 +169,7 @@ struct ContentView: View {
                             processMonitor: processMonitor,
                             shellStateManager: shellStateManager,
                             systemMonitor: systemMonitor,
+                            notificationCoordinator: notificationCoordinator,
                             surfaceViews: surfaceViews,
                             onWorkspaceSwitch: { ensureSurfaceForActiveWorkspace() },
                             onCreateWorkspace: { createNewWorkspace() },
@@ -196,6 +218,7 @@ struct ContentView: View {
                             claudeMonitor: claudeMonitor,
                             claudeFileWatcher: claudeFileWatcher,
                             currentDirectory: focusedDirectory,
+                            notificationCoordinator: notificationCoordinator,
                             refreshTrigger: rightPanelRefreshTrigger,
                             onClose: { isRightPanelVisible = false },
                             onExecuteCommand: { command in
@@ -320,6 +343,7 @@ struct ContentView: View {
     private func initializeTerminal() async {
         GeobukLogger.info(.app, "App initializing")
         BlockModeZshSetup.initialize()
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         do {
             try ghosttyApp.create()
 
