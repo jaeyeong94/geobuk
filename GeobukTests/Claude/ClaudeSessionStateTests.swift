@@ -3,6 +3,7 @@ import Foundation
 @testable import Geobuk
 
 @Suite("ClaudeSessionState")
+@MainActor
 struct ClaudeSessionStateTests {
 
     // MARK: - 단위 테스트 (Unit Tests)

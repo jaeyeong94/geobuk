@@ -3,12 +3,9 @@ import Observation
 
 /// Claude Code 세션의 상태를 관리하는 클래스
 /// stream-json 이벤트를 받아 상태 머신을 구동하고, 토큰 사용량/비용을 추적한다
-///
-/// @MainActor 컨텍스트에서 사용하도록 설계되었으나,
-/// AISessionMonitor 프로토콜(Sendable) 준수를 위해 클래스 수준 격리를 적용하지 않는다.
-/// 호출부에서 MainActor 격리를 보장해야 한다.
+@MainActor
 @Observable
-final class ClaudeSessionState: AISessionMonitor, @unchecked Sendable {
+final class ClaudeSessionState: AISessionMonitor {
     // MARK: - 상태 머신
 
     /// 현재 세션 단계

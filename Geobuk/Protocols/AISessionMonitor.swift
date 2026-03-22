@@ -13,6 +13,7 @@ enum AISessionPhase: String, Sendable {
 }
 
 /// AI 세션 모니터 프로토콜 - Claude 외 다른 AI CLI 확장 가능
+@MainActor
 protocol AISessionMonitor: AnyObject, Sendable {
     /// 현재 세션 상태
     var phase: AISessionPhase { get }
