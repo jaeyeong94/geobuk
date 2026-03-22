@@ -22,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.styleMask.insert(.fullSizeContentView)
         window.titlebarSeparatorStyle = .none
         window.toolbar = nil
+        // 타이틀바 영역의 자동 드래그를 비활성화 → 버튼 클릭 가능
+        window.isMovableByWindowBackground = false
     }
 
     func applicationWillTerminate(_ notification: Notification) {

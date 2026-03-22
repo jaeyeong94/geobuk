@@ -264,13 +264,11 @@ struct ContentView: View {
     /// hiddenTitleBar + fullSizeContentView에서 트래픽 라이트가 이 영역 위에 오버레이됨
     private var customTitleBar: some View {
         HStack(spacing: 0) {
-            // 트래픽 라이트 버튼 영역 (클릭 방지)
+            // 트래픽 라이트 버튼 영역
             Color.clear
-                .frame(width: 72)
+                .frame(width: 72, height: 28)
 
-            Spacer()
-
-            // 가운데: 앱 정보
+            // 가운데: 드래그 가능 영역 + 더블클릭 줌
             HStack(spacing: 6) {
                 Text("GEOBUK")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
@@ -304,46 +302,38 @@ struct ContentView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(TitleBarDragGesture())
+            .onTapGesture(count: 2) {
+                NSApp.mainWindow?.zoom(nil)
+            }
 
-            Spacer()
-
-            // 우측: 아이콘 — NonDraggableView로 감싸서 윈도우 드래그 방지
-            NonDraggableButtonArea {
-                HStack(spacing: 6) {
-                    Button(action: { isSidebarVisible.toggle() }) {
-                        Image(systemName: "sidebar.left")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary.opacity(0.6))
-                            .frame(width: 24, height: 24)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Toggle Sidebar (Cmd+B)")
-
-                    Button(action: { createNewWorkspace() }) {
-                        Image(systemName: "plus.square")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary.opacity(0.6))
-                            .frame(width: 24, height: 24)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("New Workspace (Cmd+T)")
-
-                    Button(action: { isSettingsOpen.toggle() }) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary.opacity(0.6))
-                            .frame(width: 24, height: 24)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Settings (Cmd+,)")
+            // 우측: 아이콘 (드래그 불가 영역)
+            HStack(spacing: 6) {
+                titleBarIcon("sidebar.left", help: "Toggle Sidebar (Cmd+B)") {
+                    isSidebarVisible.toggle()
+                }
+                titleBarIcon("plus.square", help: "New Workspace (Cmd+T)") {
+                    createNewWorkspace()
+                }
+                titleBarIcon("gearshape", help: "Settings (Cmd+,)") {
+                    isSettingsOpen.toggle()
                 }
             }
             .padding(.trailing, 10)
         }
         .frame(height: 28)
+    }
+
+    private func titleBarIcon(_ systemName: String, help: String, action: @escaping () -> Void) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 12))
+            .foregroundColor(.secondary.opacity(0.7))
+            .frame(width: 26, height: 26)
+            .contentShape(Rectangle())
+            .onTapGesture { action() }
+            .help(help)
     }
 
     private var dynamicTitle: String {
