@@ -118,7 +118,8 @@ struct ContentView: View {
                 updateFocusedDirectory()
                 if let surfaceId = notification.userInfo?["surfaceId"] as? String {
                     let command = shellStateManager.shellStates[surfaceId]?.command
-                    notificationCoordinator.commandFinished(surfaceId: surfaceId, command: command)
+                    let focusedSid = activeManager?.focusedPaneId.flatMap { surfaceViews[$0]?.viewId.uuidString }
+                    notificationCoordinator.commandFinished(surfaceId: surfaceId, command: command, focusedSurfaceId: focusedSid)
                 }
             }
             .onChange(of: claudeMonitor.sessionState.phase) { _, newPhase in

@@ -99,8 +99,13 @@ final class NotificationCoordinator {
     }
 
     /// 셸 명령 완료 시 장시간 실행이면 알림을 생성한다
-    func commandFinished(surfaceId: String, command: String?) {
+    /// focusedSurfaceId: 현재 포커스된 패널 — 포커스 중인 패널은 알림 생성하지 않음
+    func commandFinished(surfaceId: String, command: String?, focusedSurfaceId: String? = nil) {
         guard let startTime = commandStartTimes.removeValue(forKey: surfaceId) else { return }
+
+        // 현재 포커스된 패널이면 알림 불필요 (사용자가 이미 보고 있음)
+        if let focused = focusedSurfaceId, surfaceId == focused { return }
+
         let elapsed = Date().timeIntervalSince(startTime)
 
         if elapsed >= longCommandThreshold {
