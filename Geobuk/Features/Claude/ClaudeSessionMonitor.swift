@@ -165,8 +165,10 @@ final class ClaudeSessionMonitor {
             sessionBranches[sid] = branch
         }
 
-        // 단일 상태도 마지막 활성 세션으로 업데이트 (하위 호환)
-        let _ = { self.sessionState.processEvent(.sessionInit(sessionId: sid)) }()
+        // 글로벌 sessionState 초기화 (하위 호환)
+        if sessionState.sessionId != sid {
+            sessionState.processEvent(.sessionInit(sessionId: sid))
+        }
 
         GeobukLogger.debug(.claude, "Event processed", context: ["sessionId": sid, "type": type])
 
@@ -182,18 +184,25 @@ final class ClaudeSessionMonitor {
                     if let blockType = block["type"] as? String {
                         switch blockType {
                         case "thinking":
-                            // 생각 중 → Responding 상태
-                            state.processEvent(.assistantMessage(text: "(thinking...)"))
+                            let event: StreamJSONEvent = .assistantMessage(text: "(thinking...)")
+                            state.processEvent(event)
+                            sessionState.processEvent(event)
                         case "text":
                             let text = block["text"] as? String ?? ""
-                            state.processEvent(.assistantMessage(text: text))
+                            let event: StreamJSONEvent = .assistantMessage(text: text)
+                            state.processEvent(event)
+                            sessionState.processEvent(event)
                         case "tool_use":
                             let name = block["name"] as? String ?? ""
                             let id = block["id"] as? String ?? ""
-                            state.processEvent(.toolUse(id: id, name: name, input: ""))
+                            let event: StreamJSONEvent = .toolUse(id: id, name: name, input: "")
+                            state.processEvent(event)
+                            sessionState.processEvent(event)
                         case "tool_result":
                             let id = block["tool_use_id"] as? String ?? ""
-                            state.processEvent(.toolResult(id: id, content: ""))
+                            let event: StreamJSONEvent = .toolResult(id: id, content: "")
+                            state.processEvent(event)
+                            sessionState.processEvent(event)
                         default:
                             break
                         }
