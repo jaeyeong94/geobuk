@@ -234,6 +234,11 @@ struct SplitPaneView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
+            // 사용자 클릭 시 알림 읽음 처리 + 링 해제
+            if let sid = surfaceId {
+                notificationCoordinator?.markAllAsRead(source: sid)
+                dismissRing()
+            }
             if let surfaceView = surfaceViewProvider(content.id) {
                 if isRunning {
                     surfaceView.window?.makeFirstResponder(surfaceView)
