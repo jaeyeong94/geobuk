@@ -77,8 +77,8 @@ struct GeobukApp: App {
                 }
                 .keyboardShortcut("b", modifiers: [.command, .shift])
 
-                // Ctrl+1~9: 우측 패널 탭 전환 (패널이 닫혀있으면 열면서 전환)
-                ForEach(1...9, id: \.self) { number in
+                // Ctrl+0~9: 우측 패널 탭 전환 (패널이 닫혀있으면 열면서 전환)
+                ForEach(0...9, id: \.self) { number in
                     Button("Right Panel \(number)") {
                         NotificationCenter.default.post(name: .switchRightPanelTab, object: number)
                     }

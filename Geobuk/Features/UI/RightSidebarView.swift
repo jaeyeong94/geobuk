@@ -177,7 +177,7 @@ struct RightSidebarView: View {
         case .snippets:
             SnippetPanelView(onExecute: onExecuteCommand)
         case .claude:
-            ClaudeTimelinePanelView(claudeMonitor: claudeMonitor, claudeFileWatcher: claudeFileWatcher)
+            ClaudeTimelinePanelView(claudeMonitor: claudeMonitor, claudeFileWatcher: claudeFileWatcher, currentDirectory: currentDirectory)
         case .environment:
             EnvironmentPanelView(surfaceView: surfaceView)
         case .notifications:
