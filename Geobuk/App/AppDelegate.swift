@@ -3,12 +3,33 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 타이틀바 투명화 — 앱 배경과 융합
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            if let window = NSApp.mainWindow {
-                window.titlebarAppearsTransparent = true
-                window.backgroundColor = NSColor.windowBackgroundColor
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
+            configureWindow()
         }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        configureWindow()
+    }
+
+    private var windowConfigured = false
+
+    private func configureWindow() {
+        guard !windowConfigured, let window = NSApp.mainWindow else { return }
+        windowConfigured = true
+
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.backgroundColor = .clear
+        window.isOpaque = false
+
+        // 툴바 배경/구분선 제거
+        if let toolbar = window.toolbar {
+            toolbar.showsBaselineSeparator = false
+        }
+
+        // 컨텐츠가 타이틀바 뒤로 확장
+        window.styleMask.insert(.fullSizeContentView)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
