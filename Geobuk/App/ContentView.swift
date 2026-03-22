@@ -36,24 +36,64 @@ struct ContentView: View {
     @State private var rightPanelRefreshTrigger: Int = 0
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 커스텀 타이틀바
-            CustomTitleBar(
-                title: dynamicTitle,
-                workspaceName: workspaceManager.activeWorkspace?.name,
-                paneCount: activeManager?.paneCount ?? 1,
-                claudeActive: claudeFileWatcher.activeSessions.count > 0,
-                onToggleSidebar: { isSidebarVisible.toggle() },
-                onNewWorkspace: { createNewWorkspace() },
-                onSettings: { isSettingsOpen.toggle() }
-            )
+        mainContent
+            .frame(minWidth: 600, minHeight: 400)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .toolbar {
+                // 좌측: 앱 로고 + 워크스페이스 이름
+                ToolbarItem(placement: .navigation) {
+                    HStack(spacing: 6) {
+                        Text("GEOBUK")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(.green.opacity(0.8))
 
-            // 메인 콘텐츠
-            mainContent
-        }
-        .frame(minWidth: 600, minHeight: 400)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .task {
+                        if let ws = workspaceManager.activeWorkspace {
+                            Text("·")
+                                .foregroundColor(.secondary.opacity(0.4))
+                            Text(ws.name)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+
+                        if (activeManager?.paneCount ?? 1) > 1 {
+                            Text("· \(activeManager?.paneCount ?? 1) panes")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary.opacity(0.6))
+                        }
+
+                        if claudeFileWatcher.activeSessions.count > 0 {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 6, height: 6)
+                        }
+
+                        Text(dynamicTitle)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(.secondary.opacity(0.5))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+
+                // 우측: 아이콘 버튼들
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button(action: { isSidebarVisible.toggle() }) {
+                        Image(systemName: "sidebar.left")
+                    }
+                    .help("Toggle Sidebar (Cmd+B)")
+
+                    Button(action: { createNewWorkspace() }) {
+                        Image(systemName: "plus.square")
+                    }
+                    .help("New Workspace (Cmd+T)")
+
+                    Button(action: { isSettingsOpen.toggle() }) {
+                        Image(systemName: "gearshape")
+                    }
+                    .help("Settings (Cmd+,)")
+                }
+            }
+            .task {
                 await initializeTerminal()
             }
             .modifier(PaneNotificationModifier(

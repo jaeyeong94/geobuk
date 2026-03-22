@@ -2,7 +2,13 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // 소켓 서버는 ContentView에서 shellStateManager와 함께 시작
+        // 타이틀바 투명화 — 앱 배경과 융합
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if let window = NSApp.mainWindow {
+                window.titlebarAppearsTransparent = true
+                window.backgroundColor = NSColor.windowBackgroundColor
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
