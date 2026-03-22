@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var claudeMonitor = ClaudeSessionMonitor()
     @State private var claudeFileWatcher = ClaudeSessionFileWatcher()
     @State private var isSettingsOpen = false
+    @State private var isHelpOpen = false
     @State private var fontSize: Double = 14
     @State private var paddingX: Double = 8
     @State private var paddingY: Double = 4
@@ -108,6 +109,12 @@ struct ContentView: View {
                         )
                     }
                 )
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showHelp)) { _ in
+                isHelpOpen.toggle()
+            }
+            .sheet(isPresented: $isHelpOpen) {
+                HelpView(isPresented: $isHelpOpen)
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 // 앱이 포커스를 받으면 현재 패널의 알림 읽음 처리

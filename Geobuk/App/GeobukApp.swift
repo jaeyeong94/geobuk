@@ -143,4 +143,5 @@ extension Notification.Name {
     static let increaseFontSize = Notification.Name("increaseFontSize")
     static let decreaseFontSize = Notification.Name("decreaseFontSize")
     static let switchRightPanelTab = Notification.Name("switchRightPanelTab")
+    static let showHelp = Notification.Name("showHelp")
 }

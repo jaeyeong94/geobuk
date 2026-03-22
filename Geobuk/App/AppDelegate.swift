@@ -80,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func addRightAccessory(to window: NSWindow) {
         let buttonView = TitleBarAccessoryView()
         let hostingView = NonDraggableHostingView(rootView: buttonView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 100, height: 28)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 130, height: 28)
 
         let accessoryVC = NSTitlebarAccessoryViewController()
         accessoryVC.layoutAttribute = .trailing
@@ -109,6 +109,9 @@ private struct TitleBarAccessoryView: View {
             }
             accessoryButton(icon: "gearshape") {
                 NotificationCenter.default.post(name: .openSettings, object: nil)
+            }
+            accessoryButton(icon: "questionmark.circle") {
+                NotificationCenter.default.post(name: .showHelp, object: nil)
             }
         }
         .padding(.trailing, 6)

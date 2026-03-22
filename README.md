@@ -1,3 +1,10 @@
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="docs/README.ko.md">한국어</a> |
+  <a href="docs/README.ja.md">日本語</a> |
+  <a href="docs/README.zh.md">中文</a>
+</p>
+
 # Geobuk (거북)
 
 **A macOS-native terminal built for Claude Code**

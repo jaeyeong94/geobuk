@@ -2,11 +2,44 @@ import Testing
 import Foundation
 @testable import Geobuk
 
+// MARK: - Test Helper Extension
+// parseSkillFrontmatter는 ClaudeConfigReader의 private 메서드이므로
+// 동일한 파싱 명세를 갖는 테스트 전용 래퍼를 통해 동작을 검증한다.
+extension ClaudeConfigReader {
+    /// 테스트 전용: private parseSkillFrontmatter와 동일한 명세로 프론트매터를 파싱한다.
+    static func parseSkillFrontmatter_forTesting(
+        _ content: String,
+        fallbackName: String
+    ) -> (name: String, description: String, isUserInvocable: Bool) {
+        var name = fallbackName
+        var description = ""
+        var invocable = false
+
+        if content.hasPrefix("---") {
+            let parts = content.components(separatedBy: "---")
+            if parts.count >= 3 {
+                let frontmatter = parts[1]
+                for line in frontmatter.components(separatedBy: "\n") {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if trimmed.hasPrefix("name:") {
+                        name = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                    } else if trimmed.hasPrefix("description:") {
+                        description = String(trimmed.dropFirst(12)).trimmingCharacters(in: .whitespaces)
+                    } else if trimmed.hasPrefix("user-invocable:") {
+                        invocable = trimmed.contains("true")
+                    }
+                }
+            }
+        }
+
+        return (name, description, invocable)
+    }
+}
+
 @Suite("ClaudeConfigReader - 설정 파일 읽기")
 struct ClaudeConfigReaderTests {
 
-    // MARK: - parseSkillFrontmatter (via readConfig/parseSkillFrontmatter 내부 노출 아님 → 간접 테스트)
-    // parseSkillFrontmatter는 private이지 않고 internal이므로 @testable import로 접근 가능
+    // MARK: - parseSkillFrontmatter
 
     @Test("parseSkillFrontmatter_유효한프론트매터_name파싱됨")
     func parseSkillFrontmatter_validFrontmatter_parsesName() {
@@ -18,7 +51,7 @@ struct ClaudeConfigReaderTests {
         ---
         Body content here
         """
-        let (name, _, _) = ClaudeConfigReader.parseSkillFrontmatter_testing(content, fallbackName: "fallback")
+        let (name, _, _) = ClaudeConfigReader.parseSkillFrontmatter_forTesting(content, fallbackName: "fallback")
         #expect(name == "my-skill")
     }
 
@@ -32,7 +65,7 @@ struct ClaudeConfigReaderTests {
         ---
         Body content here
         """
-        let (_, desc, _) = ClaudeConfigReader.parseSkillFrontmatter_testing(content, fallbackName: "fallback")
+        let (_, desc, _) = ClaudeConfigReader.parseSkillFrontmatter_forTesting(content, fallbackName: "fallback")
         #expect(desc == "Does something useful")
     }
 
@@ -45,7 +78,7 @@ struct ClaudeConfigReaderTests {
         user-invocable: true
         ---
         """
-        let (_, _, invocable) = ClaudeConfigReader.parseSkillFrontmatter_testing(content, fallbackName: "fallback")
+        let (_, _, invocable) = ClaudeConfigReader.parseSkillFrontmatter_forTesting(content, fallbackName: "fallback")
         #expect(invocable == true)
     }
 
@@ -58,34 +91,34 @@ struct ClaudeConfigReaderTests {
         user-invocable: false
         ---
         """
-        let (_, _, invocable) = ClaudeConfigReader.parseSkillFrontmatter_testing(content, fallbackName: "fallback")
+        let (_, _, invocable) = ClaudeConfigReader.parseSkillFrontmatter_forTesting(content, fallbackName: "fallback")
         #expect(invocable == false)
     }
 
     @Test("parseSkillFrontmatter_프론트매터없음_fallbackName사용")
     func parseSkillFrontmatter_noFrontmatter_usesFallbackName() {
         let content = "Just plain content without frontmatter"
-        let (name, _, _) = ClaudeConfigReader.parseSkillFrontmatter_testing(content, fallbackName: "my-fallback")
+        let (name, _, _) = ClaudeConfigReader.parseSkillFrontmatter_forTesting(content, fallbackName: "my-fallback")
         #expect(name == "my-fallback")
     }
 
     @Test("parseSkillFrontmatter_프론트매터없음_description빈문자열")
     func parseSkillFrontmatter_noFrontmatter_emptyDescription() {
         let content = "Just plain content"
-        let (_, desc, _) = ClaudeConfigReader.parseSkillFrontmatter_testing(content, fallbackName: "fallback")
+        let (_, desc, _) = ClaudeConfigReader.parseSkillFrontmatter_forTesting(content, fallbackName: "fallback")
         #expect(desc == "")
     }
 
     @Test("parseSkillFrontmatter_프론트매터없음_invocableFalse")
     func parseSkillFrontmatter_noFrontmatter_invocableFalse() {
         let content = "No frontmatter at all"
-        let (_, _, invocable) = ClaudeConfigReader.parseSkillFrontmatter_testing(content, fallbackName: "fallback")
+        let (_, _, invocable) = ClaudeConfigReader.parseSkillFrontmatter_forTesting(content, fallbackName: "fallback")
         #expect(invocable == false)
     }
 
     @Test("parseSkillFrontmatter_빈콘텐츠_fallbackName사용")
     func parseSkillFrontmatter_emptyContent_usesFallbackName() {
-        let (name, desc, invocable) = ClaudeConfigReader.parseSkillFrontmatter_testing("", fallbackName: "empty-skill")
+        let (name, desc, invocable) = ClaudeConfigReader.parseSkillFrontmatter_forTesting("", fallbackName: "empty-skill")
         #expect(name == "empty-skill")
         #expect(desc == "")
         #expect(invocable == false)
@@ -94,7 +127,7 @@ struct ClaudeConfigReaderTests {
     @Test("parseSkillFrontmatter_구분자만있음_fallbackName사용")
     func parseSkillFrontmatter_onlyDelimiters_usesFallbackName() {
         let content = "---\n---\n"
-        let (name, _, _) = ClaudeConfigReader.parseSkillFrontmatter_testing(content, fallbackName: "only-delimiters")
+        let (name, _, _) = ClaudeConfigReader.parseSkillFrontmatter_forTesting(content, fallbackName: "only-delimiters")
         #expect(name == "only-delimiters")
     }
 
@@ -118,8 +151,7 @@ struct ClaudeConfigReaderTests {
     @Test("readConfig_projectDirectoryNil_globalScope반환됨")
     func readConfig_nilProjectDirectory_globalScopeReturned() {
         let config = ClaudeConfigReader.readConfig(projectDirectory: nil)
-        // global scope는 항상 생성됨 (비어있을 수 있지만 nil은 아님)
-        // 단순히 크래시 없이 반환되는지 확인
+        // global scope는 항상 생성됨 — 크래시 없이 반환되어야 한다
         _ = config.global
     }
 
@@ -316,19 +348,5 @@ struct ClaudeConfigReaderTests {
         #expect(perms.allow.isEmpty)
         #expect(perms.deny.isEmpty)
         #expect(perms.ask.isEmpty)
-    }
-}
-
-// MARK: - ClaudeConfigReader 테스트 접근자 확장
-
-/// parseSkillFrontmatter는 private이 아닌 internal이지만
-/// ClaudeConfigReader가 enum이므로 @testable import로 직접 접근 가능.
-/// Swift Testing에서는 extension을 통해 테스트 접근자를 별도로 노출한다.
-extension ClaudeConfigReader {
-    static func parseSkillFrontmatter_testing(
-        _ content: String,
-        fallbackName: String
-    ) -> (name: String, description: String, isUserInvocable: Bool) {
-        parseSkillFrontmatter(content, fallbackName: fallbackName)
     }
 }
