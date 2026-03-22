@@ -21,6 +21,12 @@ final class ClaudeSessionMonitor {
     /// 세션별 Git 브랜치
     private(set) var sessionBranches: [String: String] = [:]
 
+    /// 세션이 실행 중인 패널의 surfaceViewId (sessionId → surfaceViewId)
+    private(set) var sessionSurfaceIds: [String: String] = [:]
+
+    /// 모니터링 중인 surfaceViewId 목록
+    private var monitoredSurfaceIds: Set<UUID> = []
+
     /// 가격 매니저
     var pricingManager: ClaudePricingManager?
 
@@ -67,6 +73,7 @@ final class ClaudeSessionMonitor {
         let logPath = PTYLogManager.logPath(for: surfaceViewId)
         let tailer = PTYLogTailer(filePath: logPath)
         tailers[surfaceViewId] = tailer
+        monitoredSurfaceIds.insert(surfaceViewId)
 
         startMonitoring()
 

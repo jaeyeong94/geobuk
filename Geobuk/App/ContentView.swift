@@ -124,11 +124,21 @@ struct ContentView: View {
             .onChange(of: claudeMonitor.sessionState.phase) { _, newPhase in
                 guard let sessionId = claudeMonitor.sessionState.sessionId else { return }
                 let state = claudeMonitor.getState(for: sessionId)
+                // Claude가 실행 중인 패널의 surfaceId 찾기
+                let claudeSurfaceId: String? = {
+                    for (paneId, sv) in surfaceViews {
+                        if sv.isCommandRunning {
+                            return sv.viewId.uuidString
+                        }
+                    }
+                    return activeManager?.focusedPaneId.flatMap { surfaceViews[$0]?.viewId.uuidString }
+                }()
                 notificationCoordinator.handleClaudeEvent(
                     phase: newPhase,
                     sessionId: sessionId,
                     toolName: state?.currentToolName,
-                    costUSD: state?.costUSD ?? 0
+                    costUSD: state?.costUSD ?? 0,
+                    surfaceId: claudeSurfaceId
                 )
             }
             .onReceive(NotificationCenter.default.publisher(for: .geobukPWDChanged)) { notification in

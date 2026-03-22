@@ -68,12 +68,16 @@ final class NotificationCoordinator {
     }
 
     /// Claude 세션 이벤트로부터 알림을 생성한다
-    func handleClaudeEvent(phase: AISessionPhase, sessionId: String, toolName: String?, costUSD: Double) {
+    /// surfaceId: Claude가 실행 중인 패널의 viewId (링 표시용)
+    func handleClaudeEvent(phase: AISessionPhase, sessionId: String, toolName: String?, costUSD: Double, surfaceId: String? = nil) {
+        // source에 surfaceId를 포함하여 패널 링 매칭 가능하게 함
+        let source = surfaceId.map { "claude:\(sessionId):\($0)" } ?? "claude:\(sessionId)"
+
         switch phase {
         case .waitingForInput:
             let tool = toolName ?? "unknown"
             post(GeobukNotification(
-                source: "claude:\(sessionId)",
+                source: source,
                 title: "Claude is waiting for input",
                 body: "Permission required for: \(tool)",
                 priority: .immediate
@@ -82,7 +86,7 @@ final class NotificationCoordinator {
         case .sessionComplete:
             let costStr = SessionFormatter.formatCost(costUSD)
             post(GeobukNotification(
-                source: "claude:\(sessionId)",
+                source: source,
                 title: "Claude session complete",
                 body: "Cost: \(costStr)",
                 priority: .immediate
