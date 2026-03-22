@@ -242,22 +242,10 @@ struct SplitPaneView: View {
                 }
             }
         }
-        .onChange(of: isFocused) { _, focused in
-            if focused, let sid = surfaceId {
-                notificationCoordinator?.markAllAsRead(source: sid)
-                dismissRing()
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .geobukNotificationPosted)) { notification in
             guard let geobukNotification = notification.object as? GeobukNotification,
                   let sid = surfaceId,
                   geobukNotification.source.contains(sid) else { return }
-
-            // 포커스 중이면 링을 표시하지 않고 즉시 읽음 처리
-            if isFocused {
-                notificationCoordinator?.markAllAsRead(source: sid)
-                return
-            }
 
             // 알림 타입 결정 및 링 애니메이션 시작
             let alertType: PaneAlertType = {
