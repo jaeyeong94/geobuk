@@ -7,6 +7,7 @@ struct SplitContainerView: View {
     let onFocusPane: (UUID) -> Void
     let surfaceViewProvider: (UUID) -> GhosttySurfaceView?
     var notificationCoordinator: NotificationCoordinator?
+    var onResizeComplete: ((UUID, CGFloat) -> Void)?
 
     var body: some View {
         switch node {
@@ -24,13 +25,15 @@ struct SplitContainerView: View {
                 containerId: container.id,
                 direction: container.direction,
                 modelRatio: container.ratio,
+                onResizeComplete: onResizeComplete,
                 first: {
                     SplitContainerView(
                         node: container.first,
                         focusedPaneId: focusedPaneId,
                         onFocusPane: onFocusPane,
                         surfaceViewProvider: surfaceViewProvider,
-                        notificationCoordinator: notificationCoordinator
+                        notificationCoordinator: notificationCoordinator,
+                        onResizeComplete: onResizeComplete
                     )
                 },
                 second: {
@@ -39,7 +42,8 @@ struct SplitContainerView: View {
                         focusedPaneId: focusedPaneId,
                         onFocusPane: onFocusPane,
                         surfaceViewProvider: surfaceViewProvider,
-                        notificationCoordinator: notificationCoordinator
+                        notificationCoordinator: notificationCoordinator,
+                        onResizeComplete: onResizeComplete
                     )
                 }
             )
@@ -343,6 +347,7 @@ struct SplitDividerView<First: View, Second: View>: View {
     let containerId: UUID
     let direction: SplitDirection
     let modelRatio: CGFloat
+    let onResizeComplete: ((UUID, CGFloat) -> Void)?
     @State private var ratio: CGFloat
     let first: () -> First
     let second: () -> Second
@@ -355,12 +360,14 @@ struct SplitDividerView<First: View, Second: View>: View {
         containerId: UUID,
         direction: SplitDirection,
         modelRatio: CGFloat,
+        onResizeComplete: ((UUID, CGFloat) -> Void)? = nil,
         @ViewBuilder first: @escaping () -> First,
         @ViewBuilder second: @escaping () -> Second
     ) {
         self.containerId = containerId
         self.direction = direction
         self.modelRatio = modelRatio
+        self.onResizeComplete = onResizeComplete
         self._ratio = State(initialValue: modelRatio)
         self.first = first
         self.second = second
@@ -415,6 +422,9 @@ struct SplitDividerView<First: View, Second: View>: View {
                             : value.location.y
                         let newRatio = (totalSize * ratio + position - dividerThickness / 2) / totalSize
                         ratio = min(max(newRatio, minRatio), maxRatio)
+                    }
+                    .onEnded { _ in
+                        onResizeComplete?(containerId, ratio)
                     }
             )
             .onHover { isHovered in

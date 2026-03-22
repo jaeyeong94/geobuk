@@ -437,7 +437,10 @@ struct ContentView: View {
                     surfaceViewProvider: { id in
                         surfaceViews[id]
                     },
-                    notificationCoordinator: notificationCoordinator
+                    notificationCoordinator: notificationCoordinator,
+                    onResizeComplete: { containerId, ratio in
+                        splitManager.resizeSplit(containerId: containerId, ratio: ratio)
+                    }
                 )
                 .transition(.opacity)
             }
