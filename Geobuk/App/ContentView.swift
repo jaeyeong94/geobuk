@@ -36,11 +36,24 @@ struct ContentView: View {
     @State private var rightPanelRefreshTrigger: Int = 0
 
     var body: some View {
-        mainContent
-            .frame(minWidth: 600, minHeight: 400)
-            .background(Color.black)
-            .navigationTitle(dynamicTitle)
-            .task {
+        VStack(spacing: 0) {
+            // 커스텀 타이틀바
+            CustomTitleBar(
+                title: dynamicTitle,
+                workspaceName: workspaceManager.activeWorkspace?.name,
+                paneCount: activeManager?.paneCount ?? 1,
+                claudeActive: claudeFileWatcher.activeSessions.count > 0,
+                onToggleSidebar: { isSidebarVisible.toggle() },
+                onNewWorkspace: { createNewWorkspace() },
+                onSettings: { isSettingsOpen.toggle() }
+            )
+
+            // 메인 콘텐츠
+            mainContent
+        }
+        .frame(minWidth: 600, minHeight: 400)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .task {
                 await initializeTerminal()
             }
             .modifier(PaneNotificationModifier(
