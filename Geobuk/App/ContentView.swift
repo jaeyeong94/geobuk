@@ -309,32 +309,31 @@ struct ContentView: View {
                 NSApp.mainWindow?.zoom(nil)
             }
 
-            // 우측: 아이콘 (드래그 불가 영역)
-            HStack(spacing: 6) {
-                titleBarIcon("sidebar.left", help: "Toggle Sidebar (Cmd+B)") {
+            // 우측: NSButton으로 직접 처리 (hiddenTitleBar에서 SwiftUI 클릭 불가 우회)
+            HStack(spacing: 2) {
+                TitleBarButton(systemName: "sidebar.left", size: 12, color: .secondaryLabelColor) {
                     isSidebarVisible.toggle()
                 }
-                titleBarIcon("plus.square", help: "New Workspace (Cmd+T)") {
+                .frame(width: 26, height: 26)
+                .help("Toggle Sidebar (Cmd+B)")
+
+                TitleBarButton(systemName: "plus.square", size: 12, color: .secondaryLabelColor) {
                     createNewWorkspace()
                 }
-                titleBarIcon("gearshape", help: "Settings (Cmd+,)") {
+                .frame(width: 26, height: 26)
+                .help("New Workspace (Cmd+T)")
+
+                TitleBarButton(systemName: "gearshape", size: 12, color: .secondaryLabelColor) {
                     isSettingsOpen.toggle()
                 }
+                .frame(width: 26, height: 26)
+                .help("Settings (Cmd+,)")
             }
             .padding(.trailing, 10)
         }
         .frame(height: 28)
     }
 
-    private func titleBarIcon(_ systemName: String, help: String, action: @escaping () -> Void) -> some View {
-        Image(systemName: systemName)
-            .font(.system(size: 12))
-            .foregroundColor(.secondary.opacity(0.7))
-            .frame(width: 26, height: 26)
-            .contentShape(Rectangle())
-            .onTapGesture { action() }
-            .help(help)
-    }
 
     private var dynamicTitle: String {
         guard let workspace = workspaceManager.activeWorkspace else { return "Geobuk" }
