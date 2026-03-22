@@ -74,6 +74,15 @@ final class NotificationCoordinator {
         let source = surfaceId.map { "claude:\(sessionId):\($0)" } ?? "claude:\(sessionId)"
 
         switch phase {
+        case .toolExecuting:
+            let tool = toolName ?? "unknown"
+            post(GeobukNotification(
+                source: source,
+                title: "Claude: Tool Use",
+                body: tool,
+                priority: .immediate
+            ))
+
         case .waitingForInput:
             let tool = toolName ?? "unknown"
             post(GeobukNotification(
