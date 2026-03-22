@@ -35,6 +35,9 @@ struct ContentView: View {
     @AppStorage("rightSidebarWidth") private var rightSidebarWidth: Double = 350
     /// 패널 포커스 전환 시 우측 패널 강제 갱신용 카운터
     @State private var rightPanelRefreshTrigger: Int = 0
+    /// 전체 최대화 전 사이드바 상태 저장
+    @State private var savedSidebarVisible: Bool?
+    @State private var savedRightPanelVisible: Bool?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,7 +53,7 @@ struct ContentView: View {
             .modifier(PaneNotificationModifier(
                 onSplitHorizontally: { withAnimation(.easeInOut(duration: 0.15)) { splitFocusedPane(direction: .horizontal) } },
                 onSplitVertically: { withAnimation(.easeInOut(duration: 0.15)) { splitFocusedPane(direction: .vertical) } },
-                onToggleMaximize: { withAnimation(.easeInOut(duration: 0.15)) { activeManager?.toggleMaximize() } },
+                onToggleMaximize: { withAnimation(.easeInOut(duration: 0.15)) { toggleFullMaximize() } },
                 onFocusDirection: { notification in
                     if let direction = notification.object as? NavigationDirection {
                         activeManager?.focusPane(direction: direction)
@@ -766,6 +769,31 @@ struct ContentView: View {
     @MainActor
     /// userInitiated: true = 사용자 클릭/키보드로 포커스 전환 (알림 읽음 처리)
     ///                false = 시스템 자동 포커스 (명령 완료 후 블록 복귀 등, 알림 유지)
+    /// 패널 전체 최대화 토글 — 사이드바 숨기기 + 패널 최대화
+    private func toggleFullMaximize() {
+        let isCurrentlyMaximized = activeManager?.isMaximized ?? false
+
+        if isCurrentlyMaximized {
+            // 복원: 저장된 사이드바 상태 복원
+            activeManager?.toggleMaximize()
+            if let saved = savedSidebarVisible {
+                isSidebarVisible = saved
+                savedSidebarVisible = nil
+            }
+            if let saved = savedRightPanelVisible {
+                isRightPanelVisible = saved
+                savedRightPanelVisible = nil
+            }
+        } else {
+            // 최대화: 사이드바 상태 저장 후 숨기기
+            savedSidebarVisible = isSidebarVisible
+            savedRightPanelVisible = isRightPanelVisible
+            isSidebarVisible = false
+            isRightPanelVisible = false
+            activeManager?.toggleMaximize()
+        }
+    }
+
     private func focusSurfaceView(id: UUID, userInitiated: Bool = false) {
         guard let surfaceView = surfaceViews[id] else { return }
         if surfaceView.isCommandRunning {
