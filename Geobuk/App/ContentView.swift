@@ -307,31 +307,39 @@ struct ContentView: View {
 
             Spacer()
 
-            // 우측: 아이콘
-            HStack(spacing: 6) {
-                Button(action: { isSidebarVisible.toggle() }) {
-                    Image(systemName: "sidebar.left")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary.opacity(0.6))
-                }
-                .buttonStyle(.plain)
-                .help("Toggle Sidebar (Cmd+B)")
+            // 우측: 아이콘 — NonDraggableView로 감싸서 윈도우 드래그 방지
+            NonDraggableButtonArea {
+                HStack(spacing: 6) {
+                    Button(action: { isSidebarVisible.toggle() }) {
+                        Image(systemName: "sidebar.left")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Toggle Sidebar (Cmd+B)")
 
-                Button(action: { createNewWorkspace() }) {
-                    Image(systemName: "plus.square")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary.opacity(0.6))
-                }
-                .buttonStyle(.plain)
-                .help("New Workspace (Cmd+T)")
+                    Button(action: { createNewWorkspace() }) {
+                        Image(systemName: "plus.square")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("New Workspace (Cmd+T)")
 
-                Button(action: { isSettingsOpen.toggle() }) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary.opacity(0.6))
+                    Button(action: { isSettingsOpen.toggle() }) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Settings (Cmd+,)")
                 }
-                .buttonStyle(.plain)
-                .help("Settings (Cmd+,)")
             }
             .padding(.trailing, 10)
         }
