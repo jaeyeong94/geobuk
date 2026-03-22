@@ -8,6 +8,7 @@ struct TerminalSettingsView: View {
     @Binding var lineHeight: Double
     @Binding var fontFamily: String
     @Bindable var claudeSettings: ClaudeLaunchSettings
+    var notificationCoordinator: NotificationCoordinator?
 
     var onFontSizeChange: (Double) -> Void
     var onConfigChanged: () -> Void
@@ -95,6 +96,13 @@ struct TerminalSettingsView: View {
 
                 Divider()
 
+                // 알림 설정
+                if let coordinator = notificationCoordinator {
+                    NotificationSettingsSection(coordinator: coordinator)
+
+                    Divider()
+                }
+
                 Button(action: resetToDefaults) {
                     HStack {
                         Image(systemName: "arrow.counterclockwise")
@@ -167,6 +175,52 @@ struct TerminalSettingsView: View {
             }
             Slider(value: value, in: range, step: step) { _ in
                 onConfigChanged()
+            }
+        }
+    }
+}
+
+// MARK: - Notification Settings
+
+/// 알림 설정 섹션
+private struct NotificationSettingsSection: View {
+    @Bindable var coordinator: NotificationCoordinator
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Notifications")
+                .font(.system(size: 13, weight: .semibold))
+
+            Toggle(isOn: $coordinator.nativeNotificationsEnabled) {
+                HStack(spacing: 4) {
+                    Text("Desktop notifications")
+                        .font(.system(size: 12))
+                    Text("(when app is in background)")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Long command threshold")
+                        .font(.system(size: 12))
+                    Spacer()
+                    Text(verbatim: "\(Int(coordinator.longCommandThreshold))s")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                Slider(
+                    value: $coordinator.longCommandThreshold,
+                    in: 5...120,
+                    step: 5
+                )
+
+                Text("Commands running longer than this will trigger a notification")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
             }
         }
     }

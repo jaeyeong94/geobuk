@@ -94,6 +94,7 @@ struct ContentView: View {
                     lineHeight: $lineHeight,
                     fontFamily: $fontFamily,
                     claudeSettings: claudeLaunchSettings,
+                    notificationCoordinator: notificationCoordinator,
                     onFontSizeChange: { newSize in
                         setFontSizeForAllSurfaces(newSize)
                     },

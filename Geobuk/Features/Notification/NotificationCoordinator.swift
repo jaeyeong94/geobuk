@@ -9,6 +9,12 @@ import UserNotifications
 @Observable
 final class NotificationCoordinator {
 
+    init() {
+        let defaults = UserDefaults.standard
+        self.nativeNotificationsEnabled = defaults.object(forKey: "notif.nativeEnabled") as? Bool ?? true
+        self.longCommandThreshold = defaults.object(forKey: "notif.longCommandThreshold") as? TimeInterval ?? 30
+    }
+
     // MARK: - Public State
 
     /// 읽지 않은 알림 목록 (최신 순)
@@ -26,13 +32,17 @@ final class NotificationCoordinator {
     /// 알림이 있는지
     var hasUnread: Bool { !unreadNotifications.isEmpty }
 
-    // MARK: - Settings
+    // MARK: - Settings (UserDefaults 영속)
 
     /// macOS 네이티브 알림 활성화 여부
-    var nativeNotificationsEnabled: Bool = true
+    var nativeNotificationsEnabled: Bool {
+        didSet { UserDefaults.standard.set(nativeNotificationsEnabled, forKey: "notif.nativeEnabled") }
+    }
 
     /// 장시간 명령 완료 알림 임계값 (초)
-    var longCommandThreshold: TimeInterval = 30
+    var longCommandThreshold: TimeInterval {
+        didSet { UserDefaults.standard.set(longCommandThreshold, forKey: "notif.longCommandThreshold") }
+    }
 
     // MARK: - Private
 
