@@ -114,9 +114,10 @@ final class NotificationCoordinator {
     }
 
     /// 특정 소스의 모든 알림을 읽음 처리한다 (패널 포커스 시)
+    /// source는 surfaceId — 알림의 source("shell:{id}", "claude:{id}")에 포함되는지 검사
     func markAllAsRead(source: String) {
-        unreadNotifications.removeAll { $0.source.hasPrefix(source) }
-        activeAlerts.removeAll { $0.source.hasPrefix(source) }
+        unreadNotifications.removeAll { $0.source.contains(source) }
+        activeAlerts.removeAll { $0.source.contains(source) }
     }
 
     /// 모든 알림을 읽음 처리한다
