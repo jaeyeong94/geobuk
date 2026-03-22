@@ -119,6 +119,15 @@ struct ContentView: View {
                 if let surfaceId = notification.userInfo?["surfaceId"] as? String {
                     let command = shellStateManager.shellStates[surfaceId]?.command
                     notificationCoordinator.commandFinished(surfaceId: surfaceId, command: command)
+
+                    // 비활성 워크스페이스의 TUI→블록 전환 보장
+                    // SplitPaneView가 뷰 계층에 없으면 onReceive를 못 받으므로 여기서 직접 처리
+                    for (_, sv) in surfaceViews where sv.viewId.uuidString == surfaceId {
+                        if sv.isCommandRunning {
+                            sv.isCommandRunning = false
+                            sv.blockInputMode = true
+                        }
+                    }
                 }
             }
             .onChange(of: claudeMonitor.sessionState.phase) { _, newPhase in
@@ -417,7 +426,7 @@ struct ContentView: View {
     private func initializeTerminal() async {
         GeobukLogger.info(.app, "App initializing")
         BlockModeZshSetup.initialize()
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
         do {
             try ghosttyApp.create()
 
