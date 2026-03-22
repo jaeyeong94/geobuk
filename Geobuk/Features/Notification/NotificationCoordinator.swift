@@ -199,8 +199,17 @@ final class NotificationCoordinator {
         addToHistory(notification)
         unreadNotifications.insert(notification, at: 0)
 
-        // 패널 알림 생성
-        let alertType: PaneAlertType = notification.title.contains("waiting") ? .permissionRequest : .sessionComplete
+        // 패널 알림 타입 결정
+        let alertType: PaneAlertType
+        if notification.title.contains("waiting") {
+            alertType = .permissionRequest   // 빨강 펄스
+        } else if notification.title.contains("Tool Use") {
+            alertType = .commandComplete     // 파랑
+        } else if notification.title.contains("complete") {
+            alertType = .sessionComplete     // 초록
+        } else {
+            alertType = .commandComplete     // 파랑 (기본)
+        }
         activeAlerts.append(PaneAlert(
             notificationId: notification.id,
             source: notification.source,
