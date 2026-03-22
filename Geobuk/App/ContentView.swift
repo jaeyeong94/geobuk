@@ -36,70 +36,13 @@ struct ContentView: View {
     @State private var rightPanelRefreshTrigger: Int = 0
 
     var body: some View {
-        mainContent
-            .frame(minWidth: 600, minHeight: 400)
-            .background(Color(nsColor: .windowBackgroundColor))
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 6) {
-                        Text("GEOBUK")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            .foregroundColor(.green.opacity(0.8))
-
-                        if let ws = workspaceManager.activeWorkspace {
-                            Text("·")
-                                .foregroundColor(.secondary.opacity(0.3))
-                            Text(ws.name)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.secondary.opacity(0.7))
-                        }
-
-                        if (activeManager?.paneCount ?? 1) > 1 {
-                            Text("·")
-                                .foregroundColor(.secondary.opacity(0.3))
-                            Text(verbatim: "\(activeManager?.paneCount ?? 1) panes")
-                                .font(.system(size: 10))
-                                .foregroundColor(.secondary.opacity(0.5))
-                        }
-
-                        if claudeFileWatcher.activeSessions.count > 0 {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 5, height: 5)
-                        }
-
-                        Text(dynamicTitle)
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundColor(.secondary.opacity(0.4))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                }
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button(action: { isSidebarVisible.toggle() }) {
-                        Image(systemName: "sidebar.left")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Toggle Sidebar (Cmd+B)")
-
-                    Button(action: { createNewWorkspace() }) {
-                        Image(systemName: "plus.square")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("New Workspace (Cmd+T)")
-
-                    Button(action: { isSettingsOpen.toggle() }) {
-                        Image(systemName: "gearshape")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Settings (Cmd+,)")
-                }
-            }
-            .task {
+        VStack(spacing: 0) {
+            customTitleBar
+            mainContent
+        }
+        .frame(minWidth: 600, minHeight: 400)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .task {
                 await initializeTerminal()
             }
             .modifier(PaneNotificationModifier(
@@ -314,6 +257,86 @@ struct ContentView: View {
 
 
     /// 타이틀바에 표시할 동적 제목
+    // MARK: - Custom Title Bar
+
+    /// 트래픽 라이트와 같은 줄에 배치되는 커스텀 타이틀바
+    /// hiddenTitleBar + fullSizeContentView에서 트래픽 라이트가 이 영역 위에 오버레이됨
+    private var customTitleBar: some View {
+        HStack(spacing: 0) {
+            // 트래픽 라이트 버튼 영역 (클릭 방지)
+            Color.clear
+                .frame(width: 72)
+
+            Spacer()
+
+            // 가운데: 앱 정보
+            HStack(spacing: 6) {
+                Text("GEOBUK")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(.green.opacity(0.8))
+
+                if let ws = workspaceManager.activeWorkspace {
+                    Text("·")
+                        .foregroundColor(.secondary.opacity(0.3))
+                    Text(ws.name)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
+
+                if (activeManager?.paneCount ?? 1) > 1 {
+                    Text("·")
+                        .foregroundColor(.secondary.opacity(0.3))
+                    Text(verbatim: "\(activeManager?.paneCount ?? 1) panes")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary.opacity(0.5))
+                }
+
+                if claudeFileWatcher.activeSessions.count > 0 {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 5, height: 5)
+                }
+
+                Text(dynamicTitle)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.secondary.opacity(0.4))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            Spacer()
+
+            // 우측: 아이콘
+            HStack(spacing: 6) {
+                Button(action: { isSidebarVisible.toggle() }) {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                .help("Toggle Sidebar (Cmd+B)")
+
+                Button(action: { createNewWorkspace() }) {
+                    Image(systemName: "plus.square")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                .help("New Workspace (Cmd+T)")
+
+                Button(action: { isSettingsOpen.toggle() }) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                .help("Settings (Cmd+,)")
+            }
+            .padding(.trailing, 10)
+        }
+        .frame(height: 28)
+    }
+
     private var dynamicTitle: String {
         guard let workspace = workspaceManager.activeWorkspace else { return "Geobuk" }
 
