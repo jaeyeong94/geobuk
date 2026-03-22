@@ -77,7 +77,7 @@ struct SidebarView: View {
                                 isActive: isActive,
                                 isEditing: editingIndex == index,
                                 claudeSessionCount: isActive ? 0 : (processMonitor?.claudeSessionCount(for: workspace) ?? 0),
-                                unreadCount: notificationCoordinator?.unreadCount ?? 0,
+                                unreadCount: isActive ? (notificationCoordinator?.unreadCount ?? 0) : 0,
                                 editingName: $editingName,
                                 onSelect: {
                                     workspaceManager.switchToWorkspace(at: index)

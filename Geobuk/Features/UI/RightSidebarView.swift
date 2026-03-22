@@ -94,11 +94,15 @@ struct RightSidebarView: View {
             iconBar
         }
         .background(Color(nsColor: .controlBackgroundColor).opacity(isPanelExpanded ? 0.5 : 0))
+        .onChange(of: selectedTab) { _, newTab in
+            if newTab == .notifications {
+                notificationCoordinator?.markAllAsRead()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .switchRightPanelTab)) { notification in
             if let number = notification.object as? Int,
                let tab = RightPanelTab.fromNumber(number) {
                 if selectedTab == tab && isPanelExpanded {
-                    // 같은 탭 + 열려있음 → 닫기
                     isPanelExpanded = false
                 } else {
                     selectedTab = tab
