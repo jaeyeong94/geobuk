@@ -109,6 +109,15 @@ struct ContentView: View {
                     }
                 )
             }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                // 앱이 포커스를 받으면 현재 패널의 알림 읽음 처리
+                if let focusedId = activeManager?.focusedPaneId,
+                   let sv = surfaceViews[focusedId] {
+                    let sid = sv.viewId.uuidString
+                    notificationCoordinator.markAllAsRead(source: sid)
+                    NotificationCenter.default.post(name: .geobukDismissRing, object: sid)
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .geobukShellCommandStarted)) { notification in
                 if let surfaceId = notification.userInfo?["surfaceId"] as? String {
                     notificationCoordinator.commandStarted(surfaceId: surfaceId)
@@ -692,7 +701,7 @@ struct ContentView: View {
         }
         if let focusedId = workspace.splitManager.focusedPaneId {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusSurfaceView(id: focusedId)
+                focusSurfaceView(id: focusedId, userInitiated: true)
             }
         }
     }
