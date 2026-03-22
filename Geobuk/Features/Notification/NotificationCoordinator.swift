@@ -55,6 +55,9 @@ final class NotificationCoordinator {
     /// 명령 시작 시각 추적 (surfaceId → 시작 시각)
     private var commandStartTimes: [String: Date] = [:]
 
+    /// 명령 시작 시 포커스 상태 (surfaceId → 시작 시점에 포커스였는지)
+    private var commandStartedWhileFocused: [String: Bool] = [:]
+
     // MARK: - 알림 발행
 
     /// 알림을 발행한다
@@ -94,17 +97,21 @@ final class NotificationCoordinator {
     }
 
     /// 셸 명령 시작을 기록한다
-    func commandStarted(surfaceId: String) {
+    /// focusedSurfaceId: 명령 시작 시점의 포커스된 패널 ID
+    func commandStarted(surfaceId: String, focusedSurfaceId: String? = nil) {
         commandStartTimes[surfaceId] = Date()
+        commandStartedWhileFocused[surfaceId] = (surfaceId == focusedSurfaceId)
     }
 
     /// 셸 명령 완료 시 장시간 실행이면 알림을 생성한다
-    /// focusedSurfaceId: 현재 포커스된 패널 — 포커스 중인 패널은 알림 생성하지 않음
-    func commandFinished(surfaceId: String, command: String?, focusedSurfaceId: String? = nil) {
+    func commandFinished(surfaceId: String, command: String?) {
         guard let startTime = commandStartTimes.removeValue(forKey: surfaceId) else { return }
+        let wasFocused = commandStartedWhileFocused.removeValue(forKey: surfaceId) ?? true
 
-        // 현재 포커스된 패널이면 알림 불필요 (사용자가 이미 보고 있음)
-        if let focused = focusedSurfaceId, surfaceId == focused { return }
+        // 명령 시작 시 포커스된 패널이었으면 알림 불필요 (사용자가 직접 실행한 명령)
+        if wasFocused {
+            return
+        }
 
         let elapsed = Date().timeIntervalSince(startTime)
 

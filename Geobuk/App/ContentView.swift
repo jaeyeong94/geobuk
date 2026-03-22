@@ -111,15 +111,16 @@ struct ContentView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .geobukShellCommandStarted)) { notification in
                 if let surfaceId = notification.userInfo?["surfaceId"] as? String {
-                    notificationCoordinator.commandStarted(surfaceId: surfaceId)
+                    // 명령 시작 시점의 포커스 상태를 기록 (시작 시 포커스된 패널이면 알림 생성 안 함)
+                    let focusedSid = activeManager?.focusedPaneId.flatMap { surfaceViews[$0]?.viewId.uuidString }
+                    notificationCoordinator.commandStarted(surfaceId: surfaceId, focusedSurfaceId: focusedSid)
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .geobukShellPromptReady)) { notification in
                 updateFocusedDirectory()
                 if let surfaceId = notification.userInfo?["surfaceId"] as? String {
                     let command = shellStateManager.shellStates[surfaceId]?.command
-                    let focusedSid = activeManager?.focusedPaneId.flatMap { surfaceViews[$0]?.viewId.uuidString }
-                    notificationCoordinator.commandFinished(surfaceId: surfaceId, command: command, focusedSurfaceId: focusedSid)
+                    notificationCoordinator.commandFinished(surfaceId: surfaceId, command: command)
                 }
             }
             .onChange(of: claudeMonitor.sessionState.phase) { _, newPhase in
