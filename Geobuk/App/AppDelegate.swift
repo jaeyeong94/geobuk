@@ -6,6 +6,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var windowConfigured = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 중복 인스턴스 방지 — 이미 실행 중이면 종료
+        let runningApps = NSWorkspace.shared.runningApplications.filter {
+            $0.bundleIdentifier == Bundle.main.bundleIdentifier && $0.processIdentifier != getpid()
+        }
+        if !runningApps.isEmpty {
+            GeobukLogger.warn(.app, "Another Geobuk instance is running, terminating this one")
+            NSApp.terminate(nil)
+            return
+        }
+
         // 알림 delegate 설정
         UNUserNotificationCenter.current().delegate = self
 
