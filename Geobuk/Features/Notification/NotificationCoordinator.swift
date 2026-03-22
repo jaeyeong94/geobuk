@@ -12,7 +12,8 @@ final class NotificationCoordinator {
     init() {
         let defaults = UserDefaults.standard
         self.nativeNotificationsEnabled = defaults.object(forKey: "notif.nativeEnabled") as? Bool ?? true
-        self.longCommandThreshold = defaults.object(forKey: "notif.longCommandThreshold") as? TimeInterval ?? 30
+        let savedThreshold = defaults.object(forKey: "notif.longCommandThreshold") as? TimeInterval ?? 30
+        self.longCommandThreshold = max(savedThreshold, 5)
     }
 
     // MARK: - Public State
@@ -39,9 +40,13 @@ final class NotificationCoordinator {
         didSet { UserDefaults.standard.set(nativeNotificationsEnabled, forKey: "notif.nativeEnabled") }
     }
 
-    /// 장시간 명령 완료 알림 임계값 (초)
+    /// 장시간 명령 완료 알림 임계값 (초, 최소 5초)
     var longCommandThreshold: TimeInterval {
-        didSet { UserDefaults.standard.set(longCommandThreshold, forKey: "notif.longCommandThreshold") }
+        didSet {
+            let clamped = max(longCommandThreshold, 5)
+            if longCommandThreshold != clamped { longCommandThreshold = clamped }
+            UserDefaults.standard.set(longCommandThreshold, forKey: "notif.longCommandThreshold")
+        }
     }
 
     // MARK: - Private
@@ -115,6 +120,8 @@ final class NotificationCoordinator {
     func commandFinished(surfaceId: String, command: String?) {
         guard let startTime = commandStartTimes.removeValue(forKey: surfaceId) else { return }
         let elapsed = Date().timeIntervalSince(startTime)
+
+        GeobukLogger.debug(.app, "commandFinished check", context: ["surfaceId": surfaceId, "elapsed": String(format: "%.2f", elapsed), "threshold": "\(longCommandThreshold)", "willNotify": "\(elapsed >= longCommandThreshold)"])
 
         if elapsed >= longCommandThreshold {
             let duration = SessionFormatter.formatElapsedTime(elapsed)

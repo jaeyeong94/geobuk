@@ -305,9 +305,11 @@ struct SplitPaneView: View {
             // 2초 후에도 prompt가 안 오면 TUI 모드로 전환 (느린 명령)
             surfaceView.tuiTransitionTask = Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
+                GeobukLogger.debug(.shell, "TUI transition timer fired", context: ["surfaceId": sid, "isCancelled": "\(Task.isCancelled)", "shellRunning": "\(surfaceView.shellRunning)"])
                 guard !Task.isCancelled, surfaceView.shellRunning else { return }
 
                 // 아직 running → 느린 명령 (next dev, vim 등)
+                GeobukLogger.debug(.shell, "Switching to TUI mode", context: ["surfaceId": sid])
                 surfaceView.isCommandRunning = true; isRunning = true
                 surfaceView.blockInputMode = false
                 surfaceView.window?.makeFirstResponder(surfaceView)

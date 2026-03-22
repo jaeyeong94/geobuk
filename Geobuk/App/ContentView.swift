@@ -148,7 +148,10 @@ struct ContentView: View {
 
                     // 비활성 워크스페이스의 TUI→블록 전환 보장
                     // SplitPaneView가 뷰 계층에 없으면 onReceive를 못 받으므로 여기서 직접 처리
-                    for (_, sv) in surfaceViews where sv.viewId.uuidString == surfaceId {
+                    // 활성 워크스페이스는 SplitPaneView가 직접 처리하므로 건너뜀
+                    let activePaneIds = activeManager?.root.allLeaves().map(\.id) ?? []
+                    for (paneId, sv) in surfaceViews where sv.viewId.uuidString == surfaceId {
+                        guard !activePaneIds.contains(paneId) else { continue }
                         if sv.isCommandRunning {
                             sv.isCommandRunning = false
                             sv.blockInputMode = true
