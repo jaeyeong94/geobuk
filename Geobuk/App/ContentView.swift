@@ -41,6 +41,7 @@ struct ContentView: View {
             mainContent
         }
         .frame(minWidth: 600, minHeight: 400)
+        .ignoresSafeArea(.all, edges: .top)
         .background(Color(nsColor: .windowBackgroundColor))
         .task {
                 await initializeTerminal()
