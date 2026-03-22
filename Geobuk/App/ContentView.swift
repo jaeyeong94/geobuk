@@ -196,8 +196,8 @@ struct ContentView: View {
                     workspaceContentView
                         .id(workspaceManager.activeWorkspace?.id)
 
+                    // 드래그 리사이즈 핸들 (패널 열려있을 때만)
                     if isRightPanelVisible {
-                        // 드래그 리사이즈 핸들
                         Rectangle()
                             .fill(Color.gray.opacity(0.01))
                             .frame(width: 4)
@@ -210,8 +210,10 @@ struct ContentView: View {
                             .onHover { isHovered in
                                 if isHovered { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
                             }
+                    }
 
-                        RightSidebarView(
+                    // 아이콘 바는 항상 표시, 패널 콘텐츠만 토글
+                    RightSidebarView(
                             provider: terminalProcessProvider,
                             systemMonitor: systemMonitor,
                             surfaceView: activeManager?.focusedPaneId.flatMap { surfaceViews[$0] },
@@ -220,7 +222,7 @@ struct ContentView: View {
                             currentDirectory: focusedDirectory,
                             notificationCoordinator: notificationCoordinator,
                             refreshTrigger: rightPanelRefreshTrigger,
-                            onClose: { isRightPanelVisible = false },
+                            isPanelExpanded: $isRightPanelVisible,
                             onExecuteCommand: { command in
                                 // 현재 포커스된 터미널에 명령어 전송
                                 if let focusedId = activeManager?.focusedPaneId,
@@ -230,8 +232,7 @@ struct ContentView: View {
                                 }
                             }
                         )
-                        .frame(width: rightSidebarWidth)
-                    }
+                        .frame(width: isRightPanelVisible ? rightSidebarWidth : nil)
                 }
             } else if let errorMessage {
                 VStack(spacing: 12) {

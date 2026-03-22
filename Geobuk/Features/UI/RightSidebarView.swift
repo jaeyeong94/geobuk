@@ -78,28 +78,31 @@ struct RightSidebarView: View {
     var notificationCoordinator: NotificationCoordinator?
     /// 패널 포커스 전환 시 증가하여 Git 등 패널 강제 갱신
     var refreshTrigger: Int = 0
-    var onClose: (() -> Void)?
+    @Binding var isPanelExpanded: Bool
     var onExecuteCommand: ((String) -> Void)?
 
     @State private var selectedTab: RightPanelTab = .processes
 
     var body: some View {
         HStack(spacing: 0) {
-            // 패널 콘텐츠
-            panelContent
+            // 패널 콘텐츠 (열려있을 때만)
+            if isPanelExpanded {
+                panelContent
+            }
 
-            // 아이콘 탭 바 (우측 세로)
+            // 아이콘 탭 바 (항상 표시)
             iconBar
         }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .background(Color(nsColor: .controlBackgroundColor).opacity(isPanelExpanded ? 0.5 : 0))
         .onReceive(NotificationCenter.default.publisher(for: .switchRightPanelTab)) { notification in
             if let number = notification.object as? Int,
                let tab = RightPanelTab.fromNumber(number) {
-                if selectedTab == tab {
-                    // 같은 탭 → 패널 닫기
-                    onClose?()
+                if selectedTab == tab && isPanelExpanded {
+                    // 같은 탭 + 열려있음 → 닫기
+                    isPanelExpanded = false
                 } else {
                     selectedTab = tab
+                    isPanelExpanded = true
                 }
             }
         }
@@ -111,19 +114,21 @@ struct RightSidebarView: View {
         VStack(spacing: 4) {
             ForEach(RightPanelTab.allCases) { tab in
                 Button(action: {
-                    if selectedTab == tab {
-                        onClose?()
+                    if selectedTab == tab && isPanelExpanded {
+                        isPanelExpanded = false
                     } else {
                         selectedTab = tab
+                        isPanelExpanded = true
                     }
                 }) {
                     ZStack(alignment: .bottomTrailing) {
+                        let isActive = selectedTab == tab && isPanelExpanded
                         Image(systemName: tab.systemImage)
                             .font(.system(size: 22))
-                            .foregroundColor(selectedTab == tab ? .accentColor : .secondary)
+                            .foregroundColor(isActive ? .accentColor : .secondary)
                             .frame(width: 44, height: 44)
                             .background(
-                                selectedTab == tab
+                                isActive
                                     ? Color.accentColor.opacity(0.15)
                                     : Color.clear
                             )
@@ -151,14 +156,16 @@ struct RightSidebarView: View {
 
             Spacer()
 
-            Button(action: { onClose?() }) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .frame(width: 44, height: 44)
+            if isPanelExpanded {
+                Button(action: { isPanelExpanded = false }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .help("Close Panel (Cmd+Shift+B)")
             }
-            .buttonStyle(.plain)
-            .help("Close Panel (Cmd+Shift+B)")
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 4)
