@@ -5,7 +5,7 @@ struct GeobukApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        WindowGroup {
+        Window("Geobuk", id: "main") {
             ContentView()
         }
         .windowStyle(.hiddenTitleBar)
