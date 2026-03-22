@@ -20,10 +20,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        window.styleMask.insert(.fullSizeContentView)
-
-        // 툴바 제거 (커스텀 타이틀바 사용)
-        window.toolbar = nil
     }
 
     func applicationWillTerminate(_ notification: Notification) {
