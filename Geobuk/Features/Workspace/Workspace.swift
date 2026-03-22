@@ -12,9 +12,6 @@ final class Workspace: Identifiable {
     let splitManager: SplitTreeManager
     let createdAt: Date
 
-    /// git branch (if in git repo) -- Phase 3에서는 placeholder
-    var gitBranch: String?
-
     init(name: String, cwd: String) {
         self.id = UUID()
         self.name = name

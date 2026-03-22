@@ -8,11 +8,11 @@ final class AppState {
     static let shared = AppState()
 
     /// Ghostty 앱 인스턴스 초기화 여부
-    var isGhosttyInitialized = false
-
-    /// 현재 활성 워크스페이스 인덱스
-    var activeWorkspaceIndex = 0
+    private(set) var isGhosttyInitialized = false
 
     /// 소켓 서버 실행 상태
-    var isSocketServerRunning = false
+    private(set) var isSocketServerRunning = false
+
+    func markGhosttyInitialized() { isGhosttyInitialized = true }
+    func markSocketServerRunning(_ running: Bool) { isSocketServerRunning = running }
 }

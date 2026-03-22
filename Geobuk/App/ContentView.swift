@@ -161,7 +161,7 @@ struct ContentView: View {
                 let state = claudeMonitor.getState(for: sessionId)
                 // Claude가 실행 중인 패널의 surfaceId 찾기
                 let claudeSurfaceId: String? = {
-                    for (paneId, sv) in surfaceViews {
+                    for (_, sv) in surfaceViews {
                         if sv.isCommandRunning {
                             return sv.viewId.uuidString
                         }
@@ -763,7 +763,7 @@ struct ContentView: View {
         self.socketServer = server
         do {
             try await server.start()
-            AppState.shared.isSocketServerRunning = true
+            AppState.shared.markSocketServerRunning(true)
             GeobukLogger.info(.socket, "Socket server started", context: ["path": SocketServer.defaultSocketPath])
         } catch {
             GeobukLogger.error(.socket, "Socket server failed to start", error: error)

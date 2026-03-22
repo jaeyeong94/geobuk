@@ -37,12 +37,6 @@ struct WorkspaceTests {
         #expect(workspace.createdAt <= after)
     }
 
-    @Test("init_gitBranch_nil초기값")
-    func init_gitBranch_nilByDefault() {
-        let workspace = Workspace(name: "Test", cwd: "/tmp")
-        #expect(workspace.gitBranch == nil)
-    }
-
     // MARK: - 속성 변경
 
     @Test("name_변경가능")
@@ -59,10 +53,4 @@ struct WorkspaceTests {
         #expect(workspace.cwd == "/Users/new")
     }
 
-    @Test("gitBranch_설정가능")
-    func gitBranch_canBeSet() {
-        let workspace = Workspace(name: "Test", cwd: "/tmp")
-        workspace.gitBranch = "main"
-        #expect(workspace.gitBranch == "main")
-    }
 }

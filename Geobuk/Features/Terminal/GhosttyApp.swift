@@ -230,11 +230,6 @@ final class GhosttyApp {
             overrides.append("font-family=\(fontFamily)")
         }
 
-        for override in overrides {
-            // ghostty_config_load_file은 파일 경로만 받으므로 임시 파일 사용
-            // 대안: 설정을 geobuk-default.conf에 직접 쓰고 reload
-        }
-
         // 임시 설정 파일 생성
         let tempPath = NSTemporaryDirectory() + "geobuk-settings-override.conf"
         let content = overrides.joined(separator: "\n")
