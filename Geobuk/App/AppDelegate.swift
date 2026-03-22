@@ -4,13 +4,40 @@ import UserNotifications
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private var windowConfigured = false
+    /// 최초 생성된 메인 윈도우 참조 (알림 클릭 시 복귀용)
+    private weak var primaryWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 알림 클릭 시 기존 윈도우를 활성화하도록 delegate 설정
         UNUserNotificationCenter.current().delegate = self
 
+        // 새 윈도우 생성 감지 — 중복 윈도우 닫기
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidBecomeKey(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: nil
+        )
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
             configureWindow()
+        }
+    }
+
+    /// 새 윈도우가 key가 되면 중복인지 검사하여 닫기
+    @objc private func windowDidBecomeKey(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+
+        // primaryWindow 등록 (최초 1회)
+        if primaryWindow == nil {
+            primaryWindow = window
+            return
+        }
+
+        // 이미 primary가 있는데 다른 윈도우가 key가 됨 → 중복 윈도우 닫기
+        if window !== primaryWindow, !window.className.contains("Panel") {
+            window.close()
+            primaryWindow?.makeKeyAndOrderFront(nil)
         }
     }
 
@@ -22,7 +49,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        activateExistingWindow()
+        // primary 윈도우가 있으면 직접 활성화
+        if let primary = primaryWindow {
+            NSApp.activate(ignoringOtherApps: true)
+            primary.makeKeyAndOrderFront(nil)
+        } else {
+            activateExistingWindow()
+        }
         completionHandler()
     }
 
