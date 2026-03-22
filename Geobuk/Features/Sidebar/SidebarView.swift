@@ -77,7 +77,7 @@ struct SidebarView: View {
                                 isActive: isActive,
                                 isEditing: editingIndex == index,
                                 claudeSessionCount: isActive ? 0 : (processMonitor?.claudeSessionCount(for: workspace) ?? 0),
-                                unreadCount: isActive ? (notificationCoordinator?.unreadCount ?? 0) : 0,
+                                unreadCount: unreadCountForWorkspace(workspace),
                                 editingName: $editingName,
                                 onSelect: {
                                     workspaceManager.switchToWorkspace(at: index)
@@ -144,6 +144,19 @@ struct SidebarView: View {
             }
         }
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+    }
+
+    // MARK: - Notification Count
+
+    /// 워크스페이스에 속한 패널의 읽지 않은 알림 수를 반환한다
+    private func unreadCountForWorkspace(_ workspace: Workspace) -> Int {
+        guard let coordinator = notificationCoordinator else { return 0 }
+        let paneIds = workspace.splitManager.root.allLeaves().compactMap { leaf -> String? in
+            surfaceViews[leaf.id]?.viewId.uuidString
+        }
+        return coordinator.unreadNotifications.filter { notification in
+            paneIds.contains { notification.source.contains($0) }
+        }.count
     }
 
     // MARK: - Pane Info Builder
