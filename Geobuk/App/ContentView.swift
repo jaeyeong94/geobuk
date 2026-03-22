@@ -376,7 +376,8 @@ struct ContentView: View {
                         ?? splitManager.root.allLeaves()[0],
                     isFocused: true,
                     onTap: {},
-                    surfaceViewProvider: { id in surfaceViews[id] }
+                    surfaceViewProvider: { id in surfaceViews[id] },
+                    notificationCoordinator: notificationCoordinator
                 )
                 .transition(.opacity)
             } else {
@@ -389,7 +390,8 @@ struct ContentView: View {
                     },
                     surfaceViewProvider: { id in
                         surfaceViews[id]
-                    }
+                    },
+                    notificationCoordinator: notificationCoordinator
                 )
                 .transition(.opacity)
             }
