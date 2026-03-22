@@ -309,27 +309,9 @@ struct ContentView: View {
                 NSApp.mainWindow?.zoom(nil)
             }
 
-            // 우측: NSButton으로 직접 처리 (hiddenTitleBar에서 SwiftUI 클릭 불가 우회)
-            HStack(spacing: 2) {
-                TitleBarButton(systemName: "sidebar.left", size: 12, color: .secondaryLabelColor) {
-                    isSidebarVisible.toggle()
-                }
-                .frame(width: 26, height: 26)
-                .help("Toggle Sidebar (Cmd+B)")
-
-                TitleBarButton(systemName: "plus.square", size: 12, color: .secondaryLabelColor) {
-                    createNewWorkspace()
-                }
-                .frame(width: 26, height: 26)
-                .help("New Workspace (Cmd+T)")
-
-                TitleBarButton(systemName: "gearshape", size: 12, color: .secondaryLabelColor) {
-                    isSettingsOpen.toggle()
-                }
-                .frame(width: 26, height: 26)
-                .help("Settings (Cmd+,)")
-            }
-            .padding(.trailing, 10)
+            // 우측: 빈 공간 (실제 아이콘은 NSTitlebarAccessoryViewController로 배치)
+            Spacer()
+                .frame(width: 100)
         }
         .frame(height: 28)
     }
