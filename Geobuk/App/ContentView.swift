@@ -93,6 +93,7 @@ struct ContentView: View {
                     .help("Settings (Cmd+,)")
                 }
             }
+            .toolbarBackground(.hidden, for: .windowToolbar)
             .task {
                 await initializeTerminal()
             }
