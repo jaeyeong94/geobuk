@@ -36,65 +36,16 @@ struct ContentView: View {
     @State private var rightPanelRefreshTrigger: Int = 0
 
     var body: some View {
-        mainContent
-            .frame(minWidth: 600, minHeight: 400)
-            .background(Color(nsColor: .windowBackgroundColor))
-            .toolbar {
-                // 가운데: 앱 로고 + 워크스페이스 이름 + 경로
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 6) {
-                        Text("GEOBUK")
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundColor(.green.opacity(0.8))
+        VStack(spacing: 0) {
+            // 커스텀 타이틀바 (트래픽 라이트와 같은 높이)
+            titleBar
 
-                        if let ws = workspaceManager.activeWorkspace {
-                            Text("·")
-                                .foregroundColor(.secondary.opacity(0.4))
-                            Text(ws.name)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.secondary)
-                        }
-
-                        if (activeManager?.paneCount ?? 1) > 1 {
-                            Text("· \(activeManager?.paneCount ?? 1) panes")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary.opacity(0.6))
-                        }
-
-                        if claudeFileWatcher.activeSessions.count > 0 {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 6, height: 6)
-                        }
-
-                        Text(dynamicTitle)
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(.secondary.opacity(0.5))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                }
-
-                // 우측: 아이콘 버튼들
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button(action: { isSidebarVisible.toggle() }) {
-                        Image(systemName: "sidebar.left")
-                    }
-                    .help("Toggle Sidebar (Cmd+B)")
-
-                    Button(action: { createNewWorkspace() }) {
-                        Image(systemName: "plus.square")
-                    }
-                    .help("New Workspace (Cmd+T)")
-
-                    Button(action: { isSettingsOpen.toggle() }) {
-                        Image(systemName: "gearshape")
-                    }
-                    .help("Settings (Cmd+,)")
-                }
-            }
-            .toolbarBackground(.hidden, for: .windowToolbar)
-            .task {
+            // 메인 콘텐츠
+            mainContent
+        }
+        .frame(minWidth: 600, minHeight: 400)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .task {
                 await initializeTerminal()
             }
             .modifier(PaneNotificationModifier(
@@ -304,6 +255,86 @@ struct ContentView: View {
 
     private var activeManager: SplitTreeManager? {
         workspaceManager.activeWorkspace?.splitManager
+    }
+
+    // MARK: - Title Bar
+
+    private var titleBar: some View {
+        HStack(spacing: 0) {
+            // 트래픽 라이트 영역 확보
+            Color.clear
+                .frame(width: 72)
+
+            Spacer()
+
+            // 가운데: 앱 정보
+            HStack(spacing: 6) {
+                Text("GEOBUK")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(.green.opacity(0.8))
+
+                if let ws = workspaceManager.activeWorkspace {
+                    Text("·")
+                        .foregroundColor(.secondary.opacity(0.3))
+                    Text(ws.name)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
+
+                if (activeManager?.paneCount ?? 1) > 1 {
+                    Text("·")
+                        .foregroundColor(.secondary.opacity(0.3))
+                    Text(verbatim: "\(activeManager?.paneCount ?? 1) panes")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary.opacity(0.5))
+                }
+
+                if claudeFileWatcher.activeSessions.count > 0 {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 5, height: 5)
+                }
+
+                Text(dynamicTitle)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.secondary.opacity(0.4))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            Spacer()
+
+            // 우측: 아이콘
+            HStack(spacing: 4) {
+                titleButton(icon: "sidebar.left", help: "Toggle Sidebar (Cmd+B)") {
+                    isSidebarVisible.toggle()
+                }
+                titleButton(icon: "plus.square", help: "New Workspace (Cmd+T)") {
+                    createNewWorkspace()
+                }
+                titleButton(icon: "gearshape", help: "Settings (Cmd+,)") {
+                    isSettingsOpen.toggle()
+                }
+            }
+            .padding(.trailing, 8)
+        }
+        .frame(height: 28)
+        .gesture(
+            DragGesture().onChanged { _ in
+                NSApp.mainWindow?.performDrag(with: NSApp.currentEvent!)
+            }
+        )
+    }
+
+    private func titleButton(icon: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+                .foregroundColor(.secondary.opacity(0.6))
+                .frame(width: 24, height: 24)
+        }
+        .buttonStyle(.plain)
+        .help(help)
     }
 
     /// 타이틀바에 표시할 동적 제목

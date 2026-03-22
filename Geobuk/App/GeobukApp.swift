@@ -8,8 +8,7 @@ struct GeobukApp: App {
         WindowGroup {
             ContentView()
         }
-        .windowStyle(.titleBar)
-        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Workspace") {

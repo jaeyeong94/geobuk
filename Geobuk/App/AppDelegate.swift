@@ -20,16 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        window.backgroundColor = .clear
-        window.isOpaque = false
-
-        // 툴바 배경/구분선 제거
-        if let toolbar = window.toolbar {
-            toolbar.showsBaselineSeparator = false
-        }
-
-        // 컨텐츠가 타이틀바 뒤로 확장
         window.styleMask.insert(.fullSizeContentView)
+
+        // 툴바 제거 (커스텀 타이틀바 사용)
+        window.toolbar = nil
     }
 
     func applicationWillTerminate(_ notification: Notification) {
