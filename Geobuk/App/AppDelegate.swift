@@ -22,9 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        // 기존 윈도우를 앞으로 가져오기
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.mainWindow?.makeKeyAndOrderFront(nil)
+        activateExistingWindow()
         completionHandler()
     }
 
@@ -74,8 +72,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // cleanup은 ContentView.onDisappear에서 처리
     }
 
+    /// 앱 재활성화 시 (Dock 클릭, 알림 클릭) 기존 윈도우를 보여줌
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            // 윈도우가 없으면 기존 윈도우를 찾아서 표시
+            activateExistingWindow()
+        }
+        return false // false = SwiftUI가 새 윈도우를 만들지 않음
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    /// 기존 윈도우를 찾아서 활성화
+    private func activateExistingWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+
+        // 기존 윈도우를 찾아서 앞으로 가져오기
+        if let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible }) {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            // 모든 윈도우가 숨겨진 경우 — 첫 번째 윈도우를 복원
+            for window in NSApp.windows {
+                if window.className.contains("AppKit") { continue }
+                window.makeKeyAndOrderFront(nil)
+                break
+            }
+        }
     }
 }
 
