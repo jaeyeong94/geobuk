@@ -35,7 +35,8 @@ struct ContentView: View {
     @AppStorage("rightSidebarWidth") private var rightSidebarWidth: Double = 350
     /// 패널 포커스 전환 시 우측 패널 강제 갱신용 카운터
     @State private var rightPanelRefreshTrigger: Int = 0
-    /// 전체 최대화 전 사이드바 상태 저장
+    /// 전체 최대화 모드 (사이드바 숨김 포함)
+    @State private var isFullMaximized = false
     @State private var savedSidebarVisible: Bool?
     @State private var savedRightPanelVisible: Bool?
 
@@ -70,8 +71,12 @@ struct ContentView: View {
             .modifier(WorkspaceNotificationModifier(
                 onNewWorkspace: { createNewWorkspace() },
                 onCloseWorkspace: { closeActiveWorkspace() },
-                onToggleSidebar: { isSidebarVisible.toggle() },
+                onToggleSidebar: {
+                    exitFullMaximizeIfNeeded()
+                    isSidebarVisible.toggle()
+                },
                 onSwitchWorkspace: { notification in
+                    exitFullMaximizeIfNeeded()
                     if let number = notification.object as? Int {
                         workspaceManager.switchToWorkspace(at: number - 1)
                         ensureSurfaceForActiveWorkspace()
@@ -80,6 +85,7 @@ struct ContentView: View {
                 onNewClaudeSession: { startNewClaudeSession() },
                 onOpenSettings: { isSettingsOpen.toggle() },
                 onToggleRightPanel: {
+                    exitFullMaximizeIfNeeded()
                     withAnimation(.easeInOut(duration: 0.15)) {
                         isRightPanelVisible.toggle()
                     }
@@ -87,6 +93,7 @@ struct ContentView: View {
                 onIncreaseFontSize: { adjustFontSize(delta: 1) },
                 onDecreaseFontSize: { adjustFontSize(delta: -1) },
                 onSwitchRightPanelTab: { _ in
+                    exitFullMaximizeIfNeeded()
                     // RightSidebarView의 onReceive에서 isPanelExpanded 바인딩으로 직접 처리
                 }
             ))
@@ -770,12 +777,28 @@ struct ContentView: View {
     /// userInitiated: true = 사용자 클릭/키보드로 포커스 전환 (알림 읽음 처리)
     ///                false = 시스템 자동 포커스 (명령 완료 후 블록 복귀 등, 알림 유지)
     /// 패널 전체 최대화 토글 — 사이드바 숨기기 + 패널 최대화
-    private func toggleFullMaximize() {
-        let isCurrentlyMaximized = activeManager?.isMaximized ?? false
-
-        if isCurrentlyMaximized {
-            // 복원: 저장된 사이드바 상태 복원
+    /// 전체 최대화 상태이면 해제 — 저장된 사이드바 상태를 복원한 뒤 최대화 해제
+    private func exitFullMaximizeIfNeeded() {
+        guard isFullMaximized else { return }
+        // 사이드바 상태 복원
+        if let saved = savedSidebarVisible {
+            isSidebarVisible = saved
+            savedSidebarVisible = nil
+        }
+        if let saved = savedRightPanelVisible {
+            isRightPanelVisible = saved
+            savedRightPanelVisible = nil
+        }
+        // 멀티 패널 최대화 해제
+        if activeManager?.isMaximized == true {
             activeManager?.toggleMaximize()
+        }
+        isFullMaximized = false
+    }
+
+    private func toggleFullMaximize() {
+        if isFullMaximized {
+            // 복원: 저장된 사이드바 상태 복원
             if let saved = savedSidebarVisible {
                 isSidebarVisible = saved
                 savedSidebarVisible = nil
@@ -784,13 +807,22 @@ struct ContentView: View {
                 isRightPanelVisible = saved
                 savedRightPanelVisible = nil
             }
+            // 멀티 패널일 때만 SplitTreeManager 최대화 해제
+            if activeManager?.isMaximized == true {
+                activeManager?.toggleMaximize()
+            }
+            isFullMaximized = false
         } else {
             // 최대화: 사이드바 상태 저장 후 숨기기
             savedSidebarVisible = isSidebarVisible
             savedRightPanelVisible = isRightPanelVisible
             isSidebarVisible = false
             isRightPanelVisible = false
-            activeManager?.toggleMaximize()
+            // 멀티 패널일 때만 SplitTreeManager 최대화
+            if (activeManager?.paneCount ?? 1) > 1 {
+                activeManager?.toggleMaximize()
+            }
+            isFullMaximized = true
         }
     }
 
