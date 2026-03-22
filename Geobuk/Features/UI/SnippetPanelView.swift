@@ -74,6 +74,7 @@ final class SnippetStore {
             let data = try Data(contentsOf: Self.storageURL)
             snippets = try JSONDecoder().decode([CommandSnippet].self, from: data)
         } catch {
+            GeobukLogger.error(.app, "Snippet load failed", error: error)
             snippets = []
         }
     }
@@ -83,7 +84,7 @@ final class SnippetStore {
             let data = try JSONEncoder().encode(snippets)
             try data.write(to: Self.storageURL, options: .atomic)
         } catch {
-            // Persistence failure is non-fatal; state is still in memory
+            GeobukLogger.error(.app, "Snippet save failed", error: error)
         }
     }
 

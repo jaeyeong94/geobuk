@@ -104,7 +104,7 @@ struct ScriptsPanelView: View {
         .onAppear {
             loadScripts()
         }
-        .onChange(of: currentDirectory) { _ in
+        .onChange(of: currentDirectory) { _, _ in
             loadScripts()
         }
     }

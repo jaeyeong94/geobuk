@@ -184,7 +184,7 @@ struct GitPanelView: View {
             prPollTask?.cancel()
             prPollTask = nil
         }
-        .onChange(of: currentDirectory) { _ in
+        .onChange(of: currentDirectory) { _, _ in
             refresh()
             refreshPRs()
             refreshBranchGraph()

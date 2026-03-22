@@ -591,45 +591,20 @@ struct ContentView: View {
 
     @MainActor
     private func closeFocusedPane() {
-        guard isInitialized, let splitManager = activeManager else { return }
-
-        // 패널이 1개이고 워크스페이스도 1개면 앱 종료
-        if splitManager.paneCount <= 1 && workspaceManager.workspaces.count <= 1 {
-            SessionPersistence.save(manager: workspaceManager, surfaceViews: surfaceViews)
-            NSApplication.shared.terminate(nil)
-            return
-        }
-
-        // 패널이 1개이고 워크스페이스가 여러 개면 워크스페이스 닫기
-        if splitManager.paneCount <= 1 && workspaceManager.workspaces.count > 1 {
-            closeActiveWorkspace()
-            return
-        }
-
-        if let closingId = splitManager.focusedPaneId {
-            GeobukLogger.info(.workspace, "Pane closing", context: ["paneId": closingId.uuidString])
-            splitManager.closeFocusedPane()
-
-            if let surfaceView = surfaceViews.removeValue(forKey: closingId) {
-                claudeMonitor.stopMonitoring(surfaceViewId: surfaceView.viewId)
-                surfaceView.close()
-            }
-
-            if let newFocusId = splitManager.focusedPaneId {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    focusSurfaceView(id: newFocusId)
-                }
-            }
-        }
+        guard isInitialized, let focusedId = activeManager?.focusedPaneId else { return }
+        closePane(id: focusedId)
     }
-
-    // MARK: - Auto-close Pane (child exited)
 
     /// surfaceView에 해당하는 패널을 자동으로 닫는다 (자식 프로세스 종료 시)
     @MainActor
     private func closePane(for surfaceView: GhosttySurfaceView) {
-        // surfaceView의 viewId가 아닌, surfaceViews 딕셔너리의 key(paneId)를 찾아야 함
         guard let paneId = surfaceViews.first(where: { $0.value === surfaceView })?.key else { return }
+        closePane(id: paneId)
+    }
+
+    /// 패널 닫기 공통 로직
+    @MainActor
+    private func closePane(id paneId: UUID) {
         guard let splitManager = activeManager else { return }
 
         // 패널이 1개이고 워크스페이스도 1개면 앱 종료
@@ -645,9 +620,8 @@ struct ContentView: View {
             return
         }
 
-        GeobukLogger.info(.workspace, "Pane auto-closing (child exited)", context: ["paneId": paneId.uuidString])
+        GeobukLogger.info(.workspace, "Pane closing", context: ["paneId": paneId.uuidString])
 
-        // 해당 패널에 포커스를 맞추고 닫기
         splitManager.setFocusedPane(id: paneId)
         splitManager.closeFocusedPane()
 
