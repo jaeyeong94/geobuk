@@ -126,9 +126,11 @@ final class NotificationCoordinator {
 
     /// 특정 소스의 모든 알림을 읽음 처리한다 (패널 포커스 시)
     /// source는 surfaceId — 알림의 source("shell:{id}", "claude:{id}")에 포함되는지 검사
+    /// 생성 후 2초 이내의 알림은 보호 (promptReady와 동시 실행으로 즉시 사라지는 것 방지)
     func markAllAsRead(source: String) {
-        unreadNotifications.removeAll { $0.source.contains(source) }
-        activeAlerts.removeAll { $0.source.contains(source) }
+        let cutoff = Date().addingTimeInterval(-2)
+        unreadNotifications.removeAll { $0.source.contains(source) && $0.timestamp < cutoff }
+        activeAlerts.removeAll { $0.source.contains(source) && $0.timestamp < cutoff }
         updateDockBadge()
     }
 
