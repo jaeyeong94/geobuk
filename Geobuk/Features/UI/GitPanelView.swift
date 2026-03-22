@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Git 상태 패널 — 브랜치, 변경 파일, 최근 커밋, PR, 브랜치 그래프 표시
+/// Git 상태 패널 — 브랜치, 변경 파일, 최근 커밋, PR, 브랜치 그래프, 워크플로우, 최근 실행 표시
 struct GitPanelView: View {
     var currentDirectory: String?
 
@@ -19,6 +19,13 @@ struct GitPanelView: View {
 
     @State private var branchGraphLines: [BranchGraphLine] = []
     @State private var isGraphLoading: Bool = false
+
+    @State private var workflows: [WorkflowFile] = []
+    @State private var workflowsExpanded: Bool = false
+
+    @State private var recentRuns: [WorkflowRun] = []
+    @State private var runsExpanded: Bool = false
+    @State private var runsError: String? = nil
 
     @State private var branchSectionExpanded: Bool = true
     @State private var changesSectionExpanded: Bool = true
@@ -133,6 +140,30 @@ struct GitPanelView: View {
                         ) {
                             branchGraphContent
                         }
+
+                        Divider().padding(.horizontal, 12)
+
+                        // Workflows 섹션
+                        CollapsibleSectionView(
+                            title: "Workflows",
+                            systemImage: "gearshape.2",
+                            isExpanded: $workflowsExpanded,
+                            badge: workflows.isEmpty ? nil : "\(workflows.count)"
+                        ) {
+                            workflowsContent
+                        }
+
+                        Divider().padding(.horizontal, 12)
+
+                        // Recent Runs 섹션
+                        CollapsibleSectionView(
+                            title: "Recent Runs",
+                            systemImage: "play.circle",
+                            isExpanded: $runsExpanded,
+                            badge: recentRuns.isEmpty ? nil : "\(recentRuns.count)"
+                        ) {
+                            recentRunsContent
+                        }
                     }
                     .padding(.top, 4)
                 }
@@ -142,6 +173,8 @@ struct GitPanelView: View {
             refresh()
             refreshPRs()
             refreshBranchGraph()
+            refreshWorkflows()
+            refreshRuns()
             startPolling()
             startPRPolling()
         }
@@ -155,6 +188,8 @@ struct GitPanelView: View {
             refresh()
             refreshPRs()
             refreshBranchGraph()
+            refreshWorkflows()
+            refreshRuns()
         }
     }
 
@@ -264,6 +299,66 @@ struct GitPanelView: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(branchGraphLines) { line in
                     graphLineRow(line)
+                }
+            }
+            .padding(.bottom, 4)
+        }
+    }
+
+    @ViewBuilder
+    private var workflowsContent: some View {
+        if workflows.isEmpty {
+            Text("No workflow files found")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary.opacity(0.6))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .padding(.bottom, 4)
+        } else {
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(workflows) { workflow in
+                    workflowRow(workflow)
+                }
+            }
+            .padding(.bottom, 4)
+        }
+    }
+
+    @ViewBuilder
+    private var recentRunsContent: some View {
+        if let error = runsError {
+            VStack(alignment: .leading, spacing: 4) {
+                if error.contains("not installed") || error.contains("not found") {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                        Text("Install GitHub CLI: brew install gh")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                } else {
+                    Text(error)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary.opacity(0.7))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                }
+            }
+            .padding(.bottom, 4)
+        } else if recentRuns.isEmpty {
+            Text("No recent runs")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary.opacity(0.6))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .padding(.bottom, 4)
+        } else {
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(recentRuns) { run in
+                    runRow(run)
                 }
             }
             .padding(.bottom, 4)
@@ -400,6 +495,97 @@ struct GitPanelView: View {
         .padding(.vertical, 2)
     }
 
+    private func workflowRow(_ workflow: WorkflowFile) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Text(workflow.filename)
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+
+            if workflow.name != workflow.filename {
+                Text(workflow.name)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+
+            if !workflow.triggers.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(workflow.triggers, id: \.self) { trigger in
+                        Text(Self.triggerIcon(for: trigger) + trigger)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.secondary.opacity(0.12))
+                            .cornerRadius(3)
+                    }
+                }
+            }
+
+            if !workflow.jobs.isEmpty {
+                Text(workflow.jobs.joined(separator: ", "))
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary.opacity(0.7))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button("Open File") {
+                if let dir = currentDirectory {
+                    let filePath = dir + "/.github/workflows/" + workflow.filename
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: filePath)])
+                }
+            }
+        }
+    }
+
+    private func runRow(_ run: WorkflowRun) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(Self.runStatusIcon(status: run.status, conclusion: run.conclusion))
+                    .font(.system(size: 12))
+
+                Text(run.name)
+                    .font(.system(size: 12))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer()
+
+                Text(Self.relativeTime(from: run.createdAt))
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+
+            Text(run.headBranch)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 3)
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button("Open in Browser") {
+                if let url = URL(string: run.url) {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            Button("Re-run") {
+                rerunWorkflow(run)
+            }
+        }
+    }
+
     // MARK: - Data Loading
 
     private func refresh() {
@@ -472,6 +658,58 @@ struct GitPanelView: View {
         }
     }
 
+    private func refreshWorkflows() {
+        guard let dir = currentDirectory, !dir.isEmpty else { return }
+
+        Task.detached(priority: .background) {
+            let parsed = Self.parseWorkflowFiles(in: dir)
+            await MainActor.run {
+                self.workflows = parsed
+            }
+        }
+    }
+
+    private func refreshRuns() {
+        guard let dir = currentDirectory, !dir.isEmpty else { return }
+
+        Task.detached(priority: .background) {
+            let result = Self.runGHRunList(in: dir)
+            await MainActor.run {
+                switch result {
+                case .success(let runs):
+                    self.recentRuns = runs
+                    self.runsError = nil
+                case .failure(let error):
+                    self.recentRuns = []
+                    self.runsError = error.message
+                }
+            }
+        }
+    }
+
+    private func rerunWorkflow(_ run: WorkflowRun) {
+        guard let dir = currentDirectory, !dir.isEmpty else { return }
+
+        Task.detached(priority: .background) {
+            let ghPaths = ["/usr/local/bin/gh", "/opt/homebrew/bin/gh"]
+            guard let ghPath = ghPaths.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else { return }
+
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: ghPath)
+            // Extract run ID from URL: last path component
+            let runId = run.url.components(separatedBy: "/").last ?? ""
+            process.arguments = ["run", "rerun", runId]
+            process.currentDirectoryURL = URL(fileURLWithPath: dir)
+
+            var env = ProcessInfo.processInfo.environment
+            env["PATH"] = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:" + (env["PATH"] ?? "")
+            process.environment = env
+
+            try? process.run()
+            process.waitUntilExit()
+        }
+    }
+
     private func startPolling() {
         pollTask?.cancel()
         pollTask = Task {
@@ -491,6 +729,7 @@ struct GitPanelView: View {
                 try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
                 guard !Task.isCancelled else { break }
                 refreshPRs()
+                refreshRuns()
             }
         }
     }
@@ -558,6 +797,166 @@ struct GitPanelView: View {
         }
 
         return .success(prs)
+    }
+
+    /// Runs `gh run list` and returns parsed WorkflowRuns or an error.
+    nonisolated static func runGHRunList(in directory: String) -> Result<[WorkflowRun], GHError> {
+        let ghPaths = ["/usr/local/bin/gh", "/opt/homebrew/bin/gh"]
+        guard let ghPath = ghPaths.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
+            return .failure(GHError("gh not installed"))
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: ghPath)
+        process.arguments = ["run", "list", "--limit", "10", "--json", "name,status,conclusion,headBranch,createdAt,url"]
+        process.currentDirectoryURL = URL(fileURLWithPath: directory)
+
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:" + (env["PATH"] ?? "")
+        process.environment = env
+
+        let pipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = errorPipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return .failure(GHError("Failed to run gh: \(error.localizedDescription)"))
+        }
+
+        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+
+        if process.terminationStatus != 0 {
+            let errMsg = String(data: errorData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "gh failed"
+            return .failure(GHError(errMsg.isEmpty ? "gh run list failed" : errMsg))
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            return .failure(GHError("Failed to parse gh output"))
+        }
+
+        let runs = json.compactMap { item -> WorkflowRun? in
+            guard
+                let name = item["name"] as? String,
+                let status = item["status"] as? String,
+                let headBranch = item["headBranch"] as? String,
+                let createdAt = item["createdAt"] as? String,
+                let url = item["url"] as? String
+            else { return nil }
+            let conclusion = item["conclusion"] as? String
+            return WorkflowRun(name: name, status: status, conclusion: conclusion, headBranch: headBranch, createdAt: createdAt, url: url)
+        }
+
+        return .success(runs)
+    }
+
+    /// Scans `.github/workflows/` for YAML files and parses them line-by-line.
+    nonisolated static func parseWorkflowFiles(in directory: String) -> [WorkflowFile] {
+        let workflowsDir = directory + "/.github/workflows"
+        let fm = FileManager.default
+
+        guard let entries = try? fm.contentsOfDirectory(atPath: workflowsDir) else { return [] }
+
+        let yamlFiles = entries.filter { $0.hasSuffix(".yml") || $0.hasSuffix(".yaml") }
+
+        return yamlFiles.compactMap { filename -> WorkflowFile? in
+            let filePath = workflowsDir + "/" + filename
+            guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { return nil }
+            return parseWorkflowFile(filename: filename, content: content)
+        }.sorted { $0.filename < $1.filename }
+    }
+
+    nonisolated static func parseWorkflowFile(filename: String, content: String) -> WorkflowFile {
+        let lines = content.components(separatedBy: "\n")
+        var workflowName = filename
+        var triggers: [String] = []
+        var jobs: [String] = []
+
+        var parsingOn = false
+        var parsingJobs = false
+
+        for line in lines {
+            let stripped = line.trimmingCharacters(in: .whitespaces)
+
+            // Top-level "name:" key (no leading spaces)
+            if line.hasPrefix("name:") && !line.hasPrefix("name: #") {
+                let value = String(line.dropFirst("name:".count)).trimmingCharacters(in: .whitespaces)
+                if !value.isEmpty {
+                    workflowName = value
+                }
+                parsingOn = false
+                parsingJobs = false
+                continue
+            }
+
+            // Top-level "on:" key
+            if line.hasPrefix("on:") {
+                parsingOn = true
+                parsingJobs = false
+                // Check if value is inline: "on: push" or "on: [push, pull_request]"
+                let inlineValue = String(line.dropFirst("on:".count)).trimmingCharacters(in: .whitespaces)
+                if !inlineValue.isEmpty && inlineValue != "" {
+                    // Could be "[push, pull_request]" or "push" or "workflow_dispatch"
+                    let cleaned = inlineValue
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+                    let parts = cleaned.components(separatedBy: ",")
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
+                    if !parts.isEmpty {
+                        triggers = parts
+                        parsingOn = false
+                    }
+                }
+                continue
+            }
+
+            // Top-level "jobs:" key
+            if line.hasPrefix("jobs:") {
+                parsingJobs = true
+                parsingOn = false
+                continue
+            }
+
+            // If we encounter another top-level key, stop parsing sub-sections
+            if !line.hasPrefix(" ") && !line.hasPrefix("\t") && !stripped.isEmpty && !stripped.hasPrefix("#") {
+                // A non-indented non-empty line that isn't one of the above — end sub-parsing
+                if parsingOn || parsingJobs {
+                    parsingOn = false
+                    parsingJobs = false
+                }
+                continue
+            }
+
+            // Parse trigger keys: indented lines under "on:" with pattern "  key:"
+            if parsingOn {
+                // Match lines like "  push:" or "  pull_request:" at 2-space indent
+                if line.hasPrefix("  ") && !line.hasPrefix("   ") {
+                    let key = stripped.hasSuffix(":") ? String(stripped.dropLast()) : stripped
+                    let cleanKey = key.components(separatedBy: ":").first ?? key
+                    if !cleanKey.isEmpty && !cleanKey.hasPrefix("#") {
+                        triggers.append(cleanKey.trimmingCharacters(in: .whitespaces))
+                    }
+                }
+            }
+
+            // Parse job keys: indented lines under "jobs:" with pattern "  jobname:"
+            if parsingJobs {
+                // Match lines like "  build:" or "  test:" at 2-space indent (not deeper)
+                if line.hasPrefix("  ") && !line.hasPrefix("   ") {
+                    let key = stripped.hasSuffix(":") ? String(stripped.dropLast()) : stripped
+                    let cleanKey = key.components(separatedBy: ":").first ?? key
+                    if !cleanKey.isEmpty && !cleanKey.hasPrefix("#") {
+                        jobs.append(cleanKey.trimmingCharacters(in: .whitespaces))
+                    }
+                }
+            }
+        }
+
+        return WorkflowFile(filename: filename, name: workflowName, triggers: triggers, jobs: jobs)
     }
 
     nonisolated static func parseStatus(_ output: String) -> [GitFileStatus] {
@@ -684,6 +1083,53 @@ struct GitPanelView: View {
 
         return BranchGraphLine(segments: segments)
     }
+
+    // MARK: - Display Helpers (nonisolated)
+
+    nonisolated static func triggerIcon(for trigger: String) -> String {
+        switch trigger {
+        case "push":             return "🔀 "
+        case "pull_request":     return "📋 "
+        case "schedule":         return "⏰ "
+        case "workflow_dispatch": return "🖱 "
+        case "release":          return "🏷 "
+        default:                 return ""
+        }
+    }
+
+    nonisolated static func runStatusIcon(status: String, conclusion: String?) -> String {
+        if status == "in_progress" { return "🔄" }
+        if status == "queued"      { return "⏳" }
+        switch conclusion {
+        case "success":   return "✅"
+        case "failure":   return "❌"
+        case "cancelled": return "⏭"
+        case "skipped":   return "⏭"
+        default:          return "⚪"
+        }
+    }
+
+    nonisolated static func relativeTime(from iso8601: String) -> String {
+        // Parse ISO8601 date string like "2024-01-15T10:30:00Z"
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var date = formatter.date(from: iso8601)
+
+        if date == nil {
+            // Try without fractional seconds
+            let f2 = ISO8601DateFormatter()
+            f2.formatOptions = [.withInternetDateTime]
+            date = f2.date(from: iso8601)
+        }
+
+        guard let date = date else { return iso8601 }
+
+        let seconds = Int(-date.timeIntervalSinceNow)
+        if seconds < 60      { return "\(seconds)s ago" }
+        if seconds < 3600    { return "\(seconds / 60)m ago" }
+        if seconds < 86400   { return "\(seconds / 3600)h ago" }
+        return "\(seconds / 86400)d ago"
+    }
 }
 
 // MARK: - Models
@@ -756,4 +1202,22 @@ struct BranchGraphLine: Identifiable {
 struct GHError: Error {
     let message: String
     init(_ message: String) { self.message = message }
+}
+
+struct WorkflowFile: Identifiable {
+    let id = UUID()
+    let filename: String
+    let name: String          // from "name:" in YAML
+    let triggers: [String]    // from "on:" in YAML (push, pull_request, schedule, workflow_dispatch)
+    let jobs: [String]        // from "jobs:" keys in YAML
+}
+
+struct WorkflowRun: Identifiable {
+    let id = UUID()
+    let name: String
+    let status: String        // "completed", "in_progress", "queued"
+    let conclusion: String?   // "success", "failure", "cancelled", "skipped"
+    let headBranch: String
+    let createdAt: String
+    let url: String
 }

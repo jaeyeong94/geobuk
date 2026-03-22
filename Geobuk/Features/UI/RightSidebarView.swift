@@ -95,7 +95,12 @@ struct RightSidebarView: View {
         .onReceive(NotificationCenter.default.publisher(for: .switchRightPanelTab)) { notification in
             if let number = notification.object as? Int,
                let tab = RightPanelTab.fromNumber(number) {
-                selectedTab = tab
+                if selectedTab == tab {
+                    // 같은 탭 → 패널 닫기
+                    onClose?()
+                } else {
+                    selectedTab = tab
+                }
             }
         }
     }
@@ -105,7 +110,13 @@ struct RightSidebarView: View {
     private var iconBar: some View {
         VStack(spacing: 4) {
             ForEach(RightPanelTab.allCases) { tab in
-                Button(action: { selectedTab = tab }) {
+                Button(action: {
+                    if selectedTab == tab {
+                        onClose?()
+                    } else {
+                        selectedTab = tab
+                    }
+                }) {
                     ZStack(alignment: .bottomTrailing) {
                         Image(systemName: tab.systemImage)
                             .font(.system(size: 22))
