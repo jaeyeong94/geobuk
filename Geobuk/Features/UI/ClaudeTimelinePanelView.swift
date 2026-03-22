@@ -276,7 +276,7 @@ struct ClaudeTimelinePanelView: View {
         if let config = config {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    ConfigScopeView(title: "Project", scope: config.project)
+                    ConfigScopeView(title: "Project (\(PathAbbreviator.abbreviate(currentDirectory ?? "~")))", scope: config.project)
                     Divider()
                         .padding(.vertical, 4)
                     ConfigScopeView(title: "Global (~/.claude)", scope: config.global)
@@ -467,12 +467,13 @@ private struct ConfigScopeView: View {
     let title: String
     let scope: ClaudeConfigReader.ConfigScope
 
-    @State private var claudeMdExpanded = true
+    @State private var claudeMdExpanded = false
     @State private var rulesExpanded = false
     @State private var skillsExpanded = false
     @State private var settingsExpanded = false
     @State private var hooksExpanded = false
     @State private var mcpExpanded = false
+    @State private var pluginsExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -486,25 +487,28 @@ private struct ConfigScopeView: View {
                 .padding(.bottom, 4)
 
             // CLAUDE.md
-            if let md = scope.claudeMd {
-                CollapsibleSectionView(
-                    title: "CLAUDE.md",
-                    systemImage: "doc.text",
-                    isExpanded: $claudeMdExpanded,
-                    badge: nil
-                ) {
+            CollapsibleSectionView(
+                title: "CLAUDE.md",
+                systemImage: "doc.text",
+                isExpanded: $claudeMdExpanded
+            ) {
+                if let md = scope.claudeMd {
                     ClaudeMdContentView(content: md)
+                } else {
+                    emptyItem("No CLAUDE.md found")
                 }
             }
 
             // Rules
-            if !scope.rules.isEmpty {
-                CollapsibleSectionView(
-                    title: "Rules",
-                    systemImage: "list.bullet.rectangle",
-                    isExpanded: $rulesExpanded,
-                    badge: "\(scope.rules.count)"
-                ) {
+            CollapsibleSectionView(
+                title: "Rules",
+                systemImage: "list.bullet.rectangle",
+                isExpanded: $rulesExpanded,
+                badge: scope.rules.isEmpty ? nil : "\(scope.rules.count)"
+            ) {
+                if scope.rules.isEmpty {
+                    emptyItem("No rules defined")
+                } else {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(scope.rules) { rule in
                             RuleFileRow(rule: rule)
@@ -514,13 +518,15 @@ private struct ConfigScopeView: View {
             }
 
             // Skills
-            if !scope.skills.isEmpty {
-                CollapsibleSectionView(
-                    title: "Skills",
-                    systemImage: "bolt",
-                    isExpanded: $skillsExpanded,
-                    badge: "\(scope.skills.count)"
-                ) {
+            CollapsibleSectionView(
+                title: "Skills",
+                systemImage: "bolt",
+                isExpanded: $skillsExpanded,
+                badge: scope.skills.isEmpty ? nil : "\(scope.skills.count)"
+            ) {
+                if scope.skills.isEmpty {
+                    emptyItem("No skills defined")
+                } else {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(scope.skills) { skill in
                             SkillRow(skill: skill)
@@ -530,25 +536,28 @@ private struct ConfigScopeView: View {
             }
 
             // Settings (model, effort, permissions)
-            let hasSettings = scope.model != nil || scope.effort != nil || scope.permissions != nil
-            if hasSettings {
-                CollapsibleSectionView(
-                    title: "Settings",
-                    systemImage: "gear",
-                    isExpanded: $settingsExpanded
-                ) {
+            CollapsibleSectionView(
+                title: "Settings",
+                systemImage: "gear",
+                isExpanded: $settingsExpanded
+            ) {
+                if scope.model != nil || scope.effort != nil || scope.permissions != nil {
                     SettingsSummaryView(scope: scope)
+                } else {
+                    emptyItem("No settings.json found")
                 }
             }
 
             // Hooks
-            if !scope.hooks.isEmpty {
-                CollapsibleSectionView(
-                    title: "Hooks",
-                    systemImage: "arrowshape.turn.up.right",
-                    isExpanded: $hooksExpanded,
-                    badge: "\(scope.hooks.count)"
-                ) {
+            CollapsibleSectionView(
+                title: "Hooks",
+                systemImage: "arrowshape.turn.up.right",
+                isExpanded: $hooksExpanded,
+                badge: scope.hooks.isEmpty ? nil : "\(scope.hooks.count)"
+            ) {
+                if scope.hooks.isEmpty {
+                    emptyItem("No hooks configured")
+                } else {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(scope.hooks) { hook in
                             HookRow(hook: hook)
@@ -558,13 +567,15 @@ private struct ConfigScopeView: View {
             }
 
             // MCP Servers
-            if !scope.mcpServers.isEmpty {
-                CollapsibleSectionView(
-                    title: "MCP Servers",
-                    systemImage: "server.rack",
-                    isExpanded: $mcpExpanded,
-                    badge: "\(scope.mcpServers.count)"
-                ) {
+            CollapsibleSectionView(
+                title: "MCP Servers",
+                systemImage: "server.rack",
+                isExpanded: $mcpExpanded,
+                badge: scope.mcpServers.isEmpty ? nil : "\(scope.mcpServers.count)"
+            ) {
+                if scope.mcpServers.isEmpty {
+                    emptyItem("No MCP servers configured")
+                } else {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(scope.mcpServers) { server in
                             MCPServerRow(server: server)
@@ -573,16 +584,36 @@ private struct ConfigScopeView: View {
                 }
             }
 
-            // Empty state
-            if scope.claudeMd == nil && scope.rules.isEmpty && scope.skills.isEmpty &&
-               !hasSettings && scope.hooks.isEmpty && scope.mcpServers.isEmpty {
-                Text("No configuration found")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary.opacity(0.6))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+            // Plugins
+            CollapsibleSectionView(
+                title: "Plugins",
+                systemImage: "puzzlepiece",
+                isExpanded: $pluginsExpanded,
+                badge: scope.plugins.isEmpty ? nil : "\(scope.plugins.count)"
+            ) {
+                if scope.plugins.isEmpty {
+                    emptyItem("No plugins enabled")
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(scope.plugins, id: \.self) { plugin in
+                            Text(plugin)
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundColor(.primary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 3)
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private func emptyItem(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12))
+            .foregroundColor(.secondary.opacity(0.5))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
     }
 }
 

@@ -23,6 +23,8 @@ enum ClaudeConfigReader {
         let model: String?
         /// settings.json에서 파싱한 effort 값
         let effort: String?
+        /// 활성화된 플러그인 목록
+        let plugins: [String]
     }
 
     struct RuleFile: Identifiable, Sendable {
@@ -94,7 +96,8 @@ enum ClaudeConfigReader {
                 mcpServers: [],
                 permissions: nil,
                 model: nil,
-                effort: nil
+                effort: nil,
+                plugins: []
             )
         }
 
@@ -196,6 +199,12 @@ enum ClaudeConfigReader {
         let model = settingsDict?["model"] as? String
         let effort = settingsDict?["effort"] as? String
 
+        // Plugins (enabledPlugins 딕셔너리에서 활성화된 것만)
+        var plugins: [String] = []
+        if let enabledPlugins = settingsDict?["enabledPlugins"] as? [String: Bool] {
+            plugins = enabledPlugins.filter(\.value).map(\.key).sorted()
+        }
+
         return ConfigScope(
             settingsRaw: settingsRaw,
             claudeMd: claudeMd,
@@ -205,7 +214,8 @@ enum ClaudeConfigReader {
             mcpServers: mcpServers,
             permissions: permissions,
             model: model,
-            effort: effort
+            effort: effort,
+            plugins: plugins
         )
     }
 
