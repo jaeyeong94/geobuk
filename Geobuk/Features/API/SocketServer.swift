@@ -104,9 +104,8 @@ actor SocketServer {
 
         // accept 루프 시작
         let fd = serverFd
-        let sessionMgr = sessionManager
         acceptTask = Task { [weak self] in
-            await self?.acceptLoop(serverFd: fd, sessionManager: sessionMgr)
+            await self?.acceptLoop(serverFd: fd)
         }
     }
 
@@ -138,7 +137,7 @@ actor SocketServer {
 
     // MARK: - Accept Loop
 
-    private func acceptLoop(serverFd: Int32, sessionManager: SessionManager) async {
+    private func acceptLoop(serverFd: Int32) async {
         // Set non-blocking for accept with cancellation checks
         let flags = fcntl(serverFd, F_GETFL, 0)
         _ = fcntl(serverFd, F_SETFL, flags | O_NONBLOCK)
@@ -156,9 +155,8 @@ actor SocketServer {
             if clientFd >= 0 {
                 clientFds.insert(clientFd)
                 GeobukLogger.debug(.socket, "Client connected", context: ["fd": "\(clientFd)"])
-                let mgr = sessionManager
                 Task {
-                    await self.handleClient(clientFd, sessionManager: mgr)
+                    await self.handleClient(clientFd)
                     self.clientFds.remove(clientFd)
                     GeobukLogger.debug(.socket, "Client disconnected", context: ["fd": "\(clientFd)"])
                 }
@@ -174,7 +172,7 @@ actor SocketServer {
     /// 클라이언트당 최대 수신 크기 (1MB)
     private static let maxReceiveSize = 1_048_576
 
-    private func handleClient(_ clientFd: Int32, sessionManager: SessionManager) async {
+    private func handleClient(_ clientFd: Int32) async {
         // Blocking read를 별도 스레드에서 실행하여 Swift 동시성 스레드 풀 차단 방지
         let accumulated: Data = await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
@@ -209,7 +207,7 @@ actor SocketServer {
         for lineData in lines {
             guard !lineData.isEmpty else { continue }
 
-            let response = await processRequest(Data(lineData), sessionManager: sessionManager)
+            let response = await processRequest(Data(lineData))
             if let responseData = response {
                 var responseWithNewline = responseData
                 responseWithNewline.append(0x0A)
@@ -223,11 +221,11 @@ actor SocketServer {
         Darwin.close(clientFd)
     }
 
-    private func processRequest(_ data: Data, sessionManager: SessionManager) async -> Data? {
+    private func processRequest(_ data: Data) async -> Data? {
         do {
             let request = try JSONDecoder().decode(JSONRPCRequest.self, from: data)
             GeobukLogger.debug(.socket, "Request decoded", context: ["method": request.method, "hasShellState": "\(shellStateManager != nil)"])
-            let router = await APIMethodRouter(sessionManager: sessionManager, shellStateManager: shellStateManager)
+            let router = await APIMethodRouter(sessionManager: self.sessionManager, shellStateManager: self.shellStateManager)
             let response = await router.route(request)
             return try JSONEncoder().encode(response)
         } catch {
