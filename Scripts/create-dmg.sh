@@ -24,31 +24,29 @@ if command -v create-dmg &> /dev/null; then
     # 기존 DMG 제거 (create-dmg는 덮어쓰기 불가)
     rm -f "$DMG_PATH"
 
+    BG_IMG="$SCRIPT_DIR/dmg-background.png"
+    BG_OPTS=()
+    if [ -f "$BG_IMG" ]; then
+        BG_OPTS+=(--background "$BG_IMG")
+    fi
+
+    ICON_OPTS=()
+    if [ -f "$APP_PATH/Contents/Resources/AppIcon.icns" ]; then
+        ICON_OPTS+=(--volicon "$APP_PATH/Contents/Resources/AppIcon.icns")
+    fi
+
     create-dmg \
         --volname "Geobuk" \
-        --volicon "$APP_PATH/Contents/Resources/AppIcon.icns" \
+        "${ICON_OPTS[@]}" \
+        "${BG_OPTS[@]}" \
         --window-pos 200 120 \
-        --window-size 600 400 \
+        --window-size 512 384 \
         --icon-size 100 \
-        --icon "Geobuk.app" 150 190 \
+        --icon "Geobuk.app" 130 190 \
         --hide-extension "Geobuk.app" \
-        --app-drop-link 450 190 \
+        --app-drop-link 382 190 \
         "$DMG_PATH" \
-        "$APP_PATH" \
-        || {
-            # AppIcon이 없으면 아이콘 옵션 없이 재시도
-            rm -f "$DMG_PATH"
-            create-dmg \
-                --volname "Geobuk" \
-                --window-pos 200 120 \
-                --window-size 600 400 \
-                --icon-size 100 \
-                --icon "Geobuk.app" 150 190 \
-                --hide-extension "Geobuk.app" \
-                --app-drop-link 450 190 \
-                "$DMG_PATH" \
-                "$APP_PATH"
-        }
+        "$APP_PATH"
 else
     # fallback: hdiutil로 기본 DMG 생성
     echo "create-dmg not found, using hdiutil fallback"
