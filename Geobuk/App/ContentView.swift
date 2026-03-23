@@ -484,6 +484,9 @@ struct ContentView: View {
             isInitialized = true
             GeobukLogger.info(.app, "App initialized", context: ["workspaces": "\(workspaceManager.workspaces.count)"])
 
+            // PaneController 콜백 등록 (Claude Code Team split-pane 통합)
+            registerPaneController()
+
             // 초기 패널에 포커스
             if let focusedId = activeManager?.focusedPaneId {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -856,6 +859,54 @@ struct ContentView: View {
             for surfaceView in surfaceViews.values {
                 surfaceView.executeAction("decrease_font_size:\(abs(diff))")
             }
+        }
+    }
+
+    // MARK: - PaneController (Claude Code Team 통합)
+
+    @MainActor
+    private func registerPaneController() {
+        let controller = PaneController.shared
+
+        controller.onSplitPane = { [self] sourcePaneId, direction in
+            guard let splitManager = activeManager else { return nil }
+
+            // sourcePaneId(surfaceId)에 해당하는 paneId 찾기
+            let sourcePaneUUID: UUID? = surfaceViews.first { _, sv in
+                sv.viewId.uuidString == sourcePaneId
+            }?.key
+
+            if let paneId = sourcePaneUUID {
+                splitManager.setFocusedPane(id: paneId)
+            }
+
+            // 분할
+            let splitDir: SplitDirection = direction == "vertical" ? .vertical : .horizontal
+            splitFocusedPane(direction: splitDir)
+
+            // 새로 생성된 패널의 surfaceId 반환
+            guard let newPaneId = splitManager.focusedPaneId,
+                  let newSurface = surfaceViews[newPaneId] else { return nil }
+
+            GeobukLogger.info(.app, "Pane split via API", context: ["source": sourcePaneId, "new": newSurface.viewId.uuidString])
+            return newSurface.viewId.uuidString
+        }
+
+        controller.onSendKeys = { [self] surfaceId, text in
+            for (_, sv) in surfaceViews where sv.viewId.uuidString == surfaceId {
+                sv.sendText(text)
+                sv.sendKeyPress(keyCode: 36, char: "\r")
+                return true
+            }
+            return false
+        }
+
+        controller.onKillPane = { [self] surfaceId in
+            guard let paneEntry = surfaceViews.first(where: { $0.value.viewId.uuidString == surfaceId }) else {
+                return false
+            }
+            closePane(id: paneEntry.key)
+            return true
         }
     }
 }

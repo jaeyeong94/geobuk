@@ -56,7 +56,17 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
             ("GEOBUK_SOCKET_PATH", SocketServer.defaultSocketPath),
             // ZDOTDIR로 커스텀 .zshrc 로드 → 프롬프트 테마 비활성화
             ("ZDOTDIR", BlockModeZshSetup.zdotdir),
+            // Claude Code Team split-pane: iTerm2 백엔드로 인식시킴
+            ("TERM_PROGRAM", "iTerm.app"),
+            ("ITERM_SESSION_ID", "geobuk-\(viewId.uuidString)"),
         ]
+
+        // it2 shim을 PATH 앞에 배치 (실제 iTerm2의 it2보다 먼저 실행)
+        if let shimPath = Bundle.main.path(forResource: "it2", ofType: nil) {
+            let shimDir = (shimPath as NSString).deletingLastPathComponent
+            let currentPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+            envVarDefs.append(("PATH", "\(shimDir):\(currentPath)"))
+        }
 
         // C 문자열 포인터를 ghostty_surface_new 호출 전까지 유지해야 함
         // withCString 중첩 대신, 명시적으로 strdup하여 수명을 관리
@@ -133,7 +143,15 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
             ("GEOBUK_SURFACE_ID", viewId.uuidString),
             ("GEOBUK_SOCKET_PATH", SocketServer.defaultSocketPath),
             ("ZDOTDIR", BlockModeZshSetup.zdotdir),
+            ("TERM_PROGRAM", "iTerm.app"),
+            ("ITERM_SESSION_ID", "geobuk-\(viewId.uuidString)"),
         ]
+
+        if let shimPath = Bundle.main.path(forResource: "geobuk-it2-shim", ofType: nil) {
+            let shimDir = (shimPath as NSString).deletingLastPathComponent
+            let currentPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+            envVarDefs.append(("PATH", "\(shimDir):\(currentPath)"))
+        }
 
         var cKeys: [UnsafeMutablePointer<CChar>] = []
         var cValues: [UnsafeMutablePointer<CChar>] = []

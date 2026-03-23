@@ -33,6 +33,12 @@ final class APIMethodRouter {
             return handleShellReportTty(request)
         case "shell.reportState":
             return handleShellReportState(request)
+        case "pane.split":
+            return handlePaneSplit(request)
+        case "pane.sendKeys":
+            return handlePaneSendKeys(request)
+        case "pane.kill":
+            return handlePaneKill(request)
         default:
             return .error(
                 code: JSONRPCErrorCode.methodNotFound.rawValue,
@@ -254,5 +260,84 @@ final class APIMethodRouter {
         let command = params["command"]?.stringValue
         shellStateManager.reportState(surfaceId: surfaceId, state: state, command: command)
         return .success(result: .null, id: request.id)
+    }
+
+    // MARK: - Pane 핸들러 (Claude Code Team 통합)
+
+    private func handlePaneSplit(_ request: JSONRPCRequest) -> JSONRPCResponse {
+        guard let params = request.params,
+              let sourcePaneId = params["sourcePaneId"]?.stringValue else {
+            return .error(
+                code: JSONRPCErrorCode.invalidParams.rawValue,
+                message: "Missing required parameter: sourcePaneId",
+                id: request.id
+            )
+        }
+
+        let direction = params["direction"]?.stringValue ?? "horizontal"
+
+        guard let newSurfaceId = PaneController.shared.splitPane(sourcePaneId: sourcePaneId, direction: direction) else {
+            return .error(
+                code: JSONRPCErrorCode.internalError.rawValue,
+                message: "Failed to split pane",
+                id: request.id
+            )
+        }
+
+        return .success(result: .string(newSurfaceId), id: request.id)
+    }
+
+    private func handlePaneSendKeys(_ request: JSONRPCRequest) -> JSONRPCResponse {
+        guard let params = request.params,
+              let paneId = params["paneId"]?.stringValue else {
+            return .error(
+                code: JSONRPCErrorCode.invalidParams.rawValue,
+                message: "Missing required parameter: paneId",
+                id: request.id
+            )
+        }
+
+        let text = params["text"]?.stringValue ?? ""
+
+        guard text.utf8.count <= Self.maxSendKeysSize else {
+            return .error(
+                code: JSONRPCErrorCode.invalidParams.rawValue,
+                message: "Text payload exceeds maximum size",
+                id: request.id
+            )
+        }
+
+        let success = PaneController.shared.sendKeys(surfaceId: paneId, text: text)
+        if success {
+            return .success(result: .null, id: request.id)
+        } else {
+            return .error(
+                code: JSONRPCErrorCode.internalError.rawValue,
+                message: "Pane not found: \(paneId)",
+                id: request.id
+            )
+        }
+    }
+
+    private func handlePaneKill(_ request: JSONRPCRequest) -> JSONRPCResponse {
+        guard let params = request.params,
+              let paneId = params["paneId"]?.stringValue else {
+            return .error(
+                code: JSONRPCErrorCode.invalidParams.rawValue,
+                message: "Missing required parameter: paneId",
+                id: request.id
+            )
+        }
+
+        let success = PaneController.shared.killPane(surfaceId: paneId)
+        if success {
+            return .success(result: .null, id: request.id)
+        } else {
+            return .error(
+                code: JSONRPCErrorCode.internalError.rawValue,
+                message: "Pane not found: \(paneId)",
+                id: request.id
+            )
+        }
     }
 }

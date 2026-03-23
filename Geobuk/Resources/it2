@@ -1,0 +1,99 @@
+#!/bin/bash
+# Geobuk iTerm2 shim
+# Claude Code가 it2 명령을 호출하면 Geobuk Socket API로 변환한다.
+# Geobuk 터미널 내부에서만 PATH에 등록되어 실행됨.
+
+set -euo pipefail
+
+SOCKET_PATH="${GEOBUK_SOCKET_PATH:-}"
+SURFACE_ID="${GEOBUK_SURFACE_ID:-}"
+
+if [ -z "$SOCKET_PATH" ] || [ -z "$SURFACE_ID" ]; then
+    echo "error: Not running inside Geobuk terminal" >&2
+    exit 1
+fi
+
+# JSON-RPC 메시지를 Geobuk 소켓으로 전송하고 응답 반환
+_send_rpc() {
+    local payload="$1"
+    if command -v socat &>/dev/null; then
+        echo "$payload" | socat -t 1 - UNIX-CONNECT:"$SOCKET_PATH" 2>/dev/null
+    else
+        echo "$payload" | nc -U -w 1 "$SOCKET_PATH" 2>/dev/null
+    fi
+}
+
+# JSON에서 result 값 추출 (간단한 파싱)
+_extract_result() {
+    local response="$1"
+    # "result":"<value>" 패턴 추출
+    echo "$response" | sed -n 's/.*"result":"\([^"]*\)".*/\1/p'
+}
+
+case "${1:-}" in
+    session)
+        case "${2:-}" in
+            list)
+                # Claude Code가 it2 사용 가능 여부를 확인
+                # 성공(exit 0)을 반환하면 iTerm2 백엔드 사용
+                exit 0
+                ;;
+
+            split)
+                # 패널 분할 요청
+                # 옵션 파싱: -v (vertical), -s <session_id> (소스 패널)
+                shift 2  # "session" "split" 제거
+                SOURCE_ID=""
+                while [ $# -gt 0 ]; do
+                    case "$1" in
+                        -v|-h) shift ;;  # vertical/horizontal — Geobuk이 자동 결정
+                        -s) SOURCE_ID="$2"; shift 2 ;;
+                        *) shift ;;
+                    esac
+                done
+
+                # 소스 패널이 지정되지 않으면 현재 surface 사용
+                SPLIT_SOURCE="${SOURCE_ID:-$SURFACE_ID}"
+
+                # Geobuk Socket API: pane.split
+                RESPONSE=$(_send_rpc "{\"jsonrpc\":\"2.0\",\"method\":\"pane.split\",\"params\":{\"sourcePaneId\":\"$SPLIT_SOURCE\",\"direction\":\"horizontal\"},\"id\":1}")
+
+                PANE_ID=$(_extract_result "$RESPONSE")
+
+                if [ -n "$PANE_ID" ]; then
+                    # Claude Code가 파싱하는 형식: "Created new pane: <id>"
+                    echo "Created new pane: $PANE_ID"
+                    exit 0
+                else
+                    echo "error: Failed to create pane" >&2
+                    exit 1
+                fi
+                ;;
+
+            *)
+                echo "error: Unknown session subcommand: ${2:-}" >&2
+                exit 1
+                ;;
+        esac
+        ;;
+
+    *)
+        # it2 <pane_id> send-keys: stdin에서 텍스트를 읽어 해당 패널에 전송
+        PANE_ID="${1:-}"
+        SUBCOMMAND="${2:-}"
+
+        if [ "$SUBCOMMAND" = "send-keys" ]; then
+            # stdin에서 키 입력 텍스트 읽기
+            TEXT=$(cat)
+
+            # JSON 이스케이프
+            ESCAPED_TEXT=$(echo -n "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | tr -d '\n')
+
+            _send_rpc "{\"jsonrpc\":\"2.0\",\"method\":\"pane.sendKeys\",\"params\":{\"paneId\":\"$PANE_ID\",\"text\":\"$ESCAPED_TEXT\"},\"id\":1}" > /dev/null
+            exit 0
+        fi
+
+        echo "error: Unknown command: $*" >&2
+        exit 1
+        ;;
+esac
