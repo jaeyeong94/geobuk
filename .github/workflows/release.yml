@@ -68,10 +68,12 @@ jobs:
             -scheme Geobuk \
             -configuration Release \
             -archivePath build/Geobuk.xcarchive \
-            -destination 'generic/platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=YES \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            ONLY_ACTIVE_ARCH=NO \
+            ARCHS=arm64 \
             -quiet
 
       - name: Export .app
