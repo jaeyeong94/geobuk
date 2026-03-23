@@ -20,6 +20,12 @@
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.developer-tools</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2025 Geobuk Contributors. All rights reserved.</string>
     <key>NSMainStoryboardFile</key>
     <string></string>
     <key>NSPrincipalClass</key>
