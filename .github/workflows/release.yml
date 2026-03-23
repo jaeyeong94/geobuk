@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  ZIG_VERSION: "0.15.2"
+
 jobs:
   build-and-release:
     runs-on: macos-15
@@ -23,10 +26,23 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Zig
-        uses: mlugg/setup-zig@v1
+      - name: Cache Zig
+        id: cache-zig
+        uses: actions/cache@v4
         with:
-          version: 0.15.2
+          path: ~/zig
+          key: zig-macos-aarch64-${{ env.ZIG_VERSION }}
+
+      - name: Install Zig
+        if: steps.cache-zig.outputs.cache-hit != 'true'
+        run: |
+          curl -L "https://ziglang.org/download/${ZIG_VERSION}/zig-aarch64-macos-${ZIG_VERSION}.tar.xz" -o zig.tar.xz
+          mkdir -p ~/zig
+          tar -xf zig.tar.xz -C ~/zig --strip-components=1
+          rm zig.tar.xz
+
+      - name: Add Zig to PATH
+        run: echo "$HOME/zig" >> "$GITHUB_PATH"
 
       - name: Install tools
         run: |
