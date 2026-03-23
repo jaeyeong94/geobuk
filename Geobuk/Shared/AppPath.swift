@@ -58,7 +58,7 @@ enum AppPath {
                         COMMAND="$*"
                         echo "$(date '+%H:%M:%S') session run target=$TARGET_ID cmd_len=${#COMMAND}" >> "$LOG_FILE"
                         if [ -n "$TARGET_ID" ] && [ -n "$COMMAND" ]; then
-                            ESCAPED_CMD=$(echo -n "$COMMAND" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g')
+                            ESCAPED_CMD=$(echo -n "$COMMAND; exit" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g')
                             RESPONSE=$(_send_rpc "{\\"jsonrpc\\":\\"2.0\\",\\"method\\":\\"pane.sendKeys\\",\\"params\\":{\\"paneId\\":\\"$TARGET_ID\\",\\"text\\":\\"$ESCAPED_CMD\\"},\\"id\\":1}")
                             echo "$(date '+%H:%M:%S') session run response=$RESPONSE" >> "$LOG_FILE"
                         fi
