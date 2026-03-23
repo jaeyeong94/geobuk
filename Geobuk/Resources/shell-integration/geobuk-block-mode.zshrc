@@ -55,6 +55,10 @@ printf '\e[?25l'
 _geobuk_hide_cursor() { printf '\e[?25l'; }
 precmd_functions+=(_geobuk_hide_cursor)
 
+# Geobuk bin을 PATH 맨 앞에 재배치 (사용자 .zshrc가 PATH를 덮어쓴 경우 복구)
+GEOBUK_BIN_DIR="$HOME/Library/Application Support/Geobuk/bin"
+[[ -d "$GEOBUK_BIN_DIR" ]] && export PATH="$GEOBUK_BIN_DIR:$PATH"
+
 # Geobuk 셸 통합 로드
 [[ -n "$GEOBUK_SHELL_INTEGRATION" ]] && source "$GEOBUK_SHELL_INTEGRATION" 2>/dev/null
 
