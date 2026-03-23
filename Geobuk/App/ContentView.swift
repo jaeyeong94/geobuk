@@ -889,6 +889,12 @@ struct ContentView: View {
             guard let newPaneId = splitManager.focusedPaneId,
                   let newSurface = surfaceViews[newPaneId] else { return nil }
 
+            // API로 생성된 패널은 TUI 모드로 시작 (Claude Code Team 등 TUI 앱이 직접 실행됨)
+            // apiCreatedPane 플래그로 onAppear의 블록 모드 강제를 방지
+            newSurface.apiCreatedPane = true
+            newSurface.blockInputMode = false
+            newSurface.isCommandRunning = true
+
             GeobukLogger.info(.app, "Pane split via API", context: ["source": sourcePaneId, "new": newSurface.viewId.uuidString])
             return newSurface.viewId.uuidString
         }

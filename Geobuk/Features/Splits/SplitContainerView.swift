@@ -136,7 +136,13 @@ struct SplitPaneView: View {
                                 surfaceView: surfaceView
                             )
                             .onAppear {
-                                if !surfaceView.isCommandRunning { surfaceView.blockInputMode = true }; isRunning = surfaceView.isCommandRunning
+                                if surfaceView.apiCreatedPane {
+                                    // API로 생성된 패널은 TUI 모드 유지
+                                    isRunning = true
+                                } else if !surfaceView.isCommandRunning {
+                                    surfaceView.blockInputMode = true
+                                }
+                                isRunning = surfaceView.isCommandRunning
                                 currentDir = surfaceView.currentDirectory
                             }
 

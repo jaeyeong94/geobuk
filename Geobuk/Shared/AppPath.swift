@@ -28,6 +28,9 @@ enum AppPath {
         set -euo pipefail
         SOCKET_PATH="${GEOBUK_SOCKET_PATH:-}"
         SURFACE_ID="${GEOBUK_SURFACE_ID:-}"
+        LOG_FILE="$HOME/Library/Application Support/Geobuk/it2-shim.log"
+        echo "$(date '+%H:%M:%S') args: $*" >> "$LOG_FILE"
+        echo "$(date '+%H:%M:%S') SOCKET=$SOCKET_PATH SURFACE=$SURFACE_ID" >> "$LOG_FILE"
         [ -z "$SOCKET_PATH" ] || [ -z "$SURFACE_ID" ] && exit 1
         _send_rpc() {
             if command -v socat &>/dev/null; then
@@ -43,6 +46,24 @@ enum AppPath {
             session)
                 case "${2:-}" in
                     list) exit 0 ;;
+                    run)
+                        shift 2
+                        TARGET_ID=""
+                        while [ $# -gt 0 ]; do
+                            case "$1" in
+                                -s) TARGET_ID="$2"; shift 2 ;;
+                                *) break ;;
+                            esac
+                        done
+                        COMMAND="$*"
+                        echo "$(date '+%H:%M:%S') session run target=$TARGET_ID cmd_len=${#COMMAND}" >> "$LOG_FILE"
+                        if [ -n "$TARGET_ID" ] && [ -n "$COMMAND" ]; then
+                            ESCAPED_CMD=$(echo -n "$COMMAND" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g')
+                            RESPONSE=$(_send_rpc "{\\"jsonrpc\\":\\"2.0\\",\\"method\\":\\"pane.sendKeys\\",\\"params\\":{\\"paneId\\":\\"$TARGET_ID\\",\\"text\\":\\"$ESCAPED_CMD\\"},\\"id\\":1}")
+                            echo "$(date '+%H:%M:%S') session run response=$RESPONSE" >> "$LOG_FILE"
+                        fi
+                        exit 0
+                        ;;
                     split)
                         shift 2
                         SOURCE_ID=""
@@ -70,10 +91,13 @@ enum AppPath {
                 SUBCOMMAND="${2:-}"
                 if [ "$SUBCOMMAND" = "send-keys" ]; then
                     TEXT=$(cat)
+                    echo "$(date '+%H:%M:%S') send-keys pane=$PANE_ID text_len=${#TEXT}" >> "$LOG_FILE"
                     ESCAPED_TEXT=$(echo -n "$TEXT" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g; s/\\t/\\\\t/g' | tr -d '\\n')
-                    _send_rpc "{\\"jsonrpc\\":\\"2.0\\",\\"method\\":\\"pane.sendKeys\\",\\"params\\":{\\"paneId\\":\\"$PANE_ID\\",\\"text\\":\\"$ESCAPED_TEXT\\"},\\"id\\":1}" > /dev/null
+                    RESPONSE=$(_send_rpc "{\\"jsonrpc\\":\\"2.0\\",\\"method\\":\\"pane.sendKeys\\",\\"params\\":{\\"paneId\\":\\"$PANE_ID\\",\\"text\\":\\"$ESCAPED_TEXT\\"},\\"id\\":1}")
+                    echo "$(date '+%H:%M:%S') send-keys response=$RESPONSE" >> "$LOG_FILE"
                     exit 0
                 fi
+                echo "$(date '+%H:%M:%S') unknown: pane=$PANE_ID sub=$SUBCOMMAND" >> "$LOG_FILE"
                 exit 1
                 ;;
         esac

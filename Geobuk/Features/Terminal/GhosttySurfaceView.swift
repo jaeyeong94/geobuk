@@ -223,6 +223,9 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     /// TUI 전환 대기 태스크 (precmd가 오면 취소)
     var tuiTransitionTask: Task<Void, Never>?
 
+    /// API(pane.split)로 생성된 패널 — 블록 모드 대신 TUI 모드로 시작
+    var apiCreatedPane: Bool = false
+
     /// 블록 입력 모드일 때 터미널 직접 입력 비활성화
     var blockInputMode: Bool = false {
         didSet {
