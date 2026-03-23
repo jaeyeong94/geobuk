@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.15.2
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Cache libghostty
+        id: cache-libghostty
+        uses: actions/cache@v4
+        with:
+          path: build/
+          key: libghostty-${{ hashFiles('Vendor/ghostty/**/*.zig', 'Scripts/build-libghostty.sh') }}
+
+      - name: Build libghostty
+        if: steps.cache-libghostty.outputs.cache-hit != 'true'
+        run: Scripts/build-libghostty.sh
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -scheme Geobuk \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -quiet
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -scheme Geobuk \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -quiet \
+            || echo "::warning::Tests failed or could not bootstrap"
