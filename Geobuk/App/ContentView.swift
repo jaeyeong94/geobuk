@@ -568,7 +568,7 @@ struct ContentView: View {
     // MARK: - Split Operations
 
     @MainActor
-    private func splitFocusedPane(direction: SplitDirection) {
+    private func splitFocusedPane(direction: SplitDirection, startInTUIMode: Bool = false) {
         guard isInitialized, let splitManager = activeManager else { return }
 
         // 분할 전 현재 포커스된 패널의 surfaceView를 캡처 (설정 상속용)
@@ -588,8 +588,17 @@ struct ContentView: View {
             } else {
                 surfaceView = GhosttySurfaceView(app: ghosttyApp)
             }
+
+            // API 생성 패널은 surfaceViews에 넣기 전에 TUI 모드 설정
+            if startInTUIMode {
+                surfaceView.apiCreatedPane = true
+                surfaceView.blockInputMode = false
+                surfaceView.isCommandRunning = true
+                GeobukLogger.info(.app, "API pane TUI mode set", context: ["surfaceId": surfaceView.viewId.uuidString, "apiCreated": "\(surfaceView.apiCreatedPane)"])
+            }
+
             surfaceViews[newPaneId] = surfaceView
-            GeobukLogger.info(.workspace, "Pane split", context: ["direction": "\(direction)", "paneId": newPaneId.uuidString])
+            GeobukLogger.info(.workspace, "Pane split", context: ["direction": "\(direction)", "paneId": newPaneId.uuidString, "startInTUI": "\(startInTUIMode)"])
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 focusSurfaceView(id: newPaneId)
@@ -881,19 +890,13 @@ struct ContentView: View {
                 splitManager.setFocusedPane(id: paneId)
             }
 
-            // 분할
+            // 분할 (API 생성 패널은 TUI 모드로 시작)
             let splitDir: SplitDirection = direction == "vertical" ? .vertical : .horizontal
-            splitFocusedPane(direction: splitDir)
+            splitFocusedPane(direction: splitDir, startInTUIMode: true)
 
             // 새로 생성된 패널의 surfaceId 반환
             guard let newPaneId = splitManager.focusedPaneId,
                   let newSurface = surfaceViews[newPaneId] else { return nil }
-
-            // API로 생성된 패널은 TUI 모드로 시작 (Claude Code Team 등 TUI 앱이 직접 실행됨)
-            // apiCreatedPane 플래그로 onAppear의 블록 모드 강제를 방지
-            newSurface.apiCreatedPane = true
-            newSurface.blockInputMode = false
-            newSurface.isCommandRunning = true
 
             GeobukLogger.info(.app, "Pane split via API", context: ["source": sourcePaneId, "new": newSurface.viewId.uuidString])
             return newSurface.viewId.uuidString

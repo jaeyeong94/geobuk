@@ -328,14 +328,20 @@ struct SplitPaneView: View {
                   let sid = notification.userInfo?["surfaceId"] as? String,
                   sid == surfaceView.viewId.uuidString else { return }
 
-            GeobukLogger.debug(.shell, "SplitPaneView received promptReady", context: ["surfaceId": sid, "wasRunning": "\(surfaceView.isCommandRunning)", "cwd": surfaceView.currentDirectory ?? "nil"])
+            GeobukLogger.debug(.shell, "SplitPaneView received promptReady", context: ["surfaceId": sid, "wasRunning": "\(surfaceView.isCommandRunning)", "apiCreated": "\(surfaceView.apiCreatedPane)", "cwd": surfaceView.currentDirectory ?? "nil"])
             surfaceView.shellRunning = false
 
             // TUI 전환 대기 취소 (빠른 명령이 완료됨)
             surfaceView.tuiTransitionTask?.cancel()
             surfaceView.tuiTransitionTask = nil
 
-            if surfaceView.isCommandRunning {
+            if surfaceView.apiCreatedPane {
+                // API 생성 패널: 블록 모드 복원하지 않음 (TUI 유지)
+                // isRunning을 true로 유지해야 BlockInputBar가 표시되지 않음
+                // apiCreatedPane 플래그 해제 — 이후 명령은 정상 블록 모드 전환
+                surfaceView.apiCreatedPane = false
+                surfaceView.shellRunning = false
+            } else if surfaceView.isCommandRunning {
                 // TUI → 블록 모드 복귀
                 surfaceView.isCommandRunning = false; isRunning = false
                 surfaceView.blockInputMode = true
