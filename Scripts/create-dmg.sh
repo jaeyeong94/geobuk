@@ -24,21 +24,19 @@ if command -v create-dmg &> /dev/null; then
     # 기존 DMG 제거 (create-dmg는 덮어쓰기 불가)
     rm -f "$DMG_PATH"
 
+    DMG_ARGS=(--volname "Geobuk")
+
     BG_IMG="$SCRIPT_DIR/dmg-background.png"
-    BG_OPTS=()
     if [ -f "$BG_IMG" ]; then
-        BG_OPTS+=(--background "$BG_IMG")
+        DMG_ARGS+=(--background "$BG_IMG")
     fi
 
-    ICON_OPTS=()
     if [ -f "$APP_PATH/Contents/Resources/AppIcon.icns" ]; then
-        ICON_OPTS+=(--volicon "$APP_PATH/Contents/Resources/AppIcon.icns")
+        DMG_ARGS+=(--volicon "$APP_PATH/Contents/Resources/AppIcon.icns")
     fi
 
     create-dmg \
-        --volname "Geobuk" \
-        "${ICON_OPTS[@]}" \
-        "${BG_OPTS[@]}" \
+        "${DMG_ARGS[@]}" \
         --window-pos 200 120 \
         --window-size 512 384 \
         --icon-size 100 \
