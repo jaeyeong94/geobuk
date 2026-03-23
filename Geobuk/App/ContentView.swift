@@ -458,6 +458,7 @@ struct ContentView: View {
     private func initializeTerminal() async {
         GeobukLogger.info(.app, "App initializing")
         BlockModeZshSetup.initialize()
+        AppPath.installShims()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
         do {
             try ghosttyApp.create()

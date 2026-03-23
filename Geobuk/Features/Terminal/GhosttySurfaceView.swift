@@ -62,11 +62,8 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         ]
 
         // it2 shim을 PATH 앞에 배치 (실제 iTerm2의 it2보다 먼저 실행)
-        if let shimPath = Bundle.main.path(forResource: "it2", ofType: nil) {
-            let shimDir = (shimPath as NSString).deletingLastPathComponent
-            let currentPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
-            envVarDefs.append(("PATH", "\(shimDir):\(currentPath)"))
-        }
+        let currentPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+        envVarDefs.append(("PATH", "\(AppPath.binDir.path):\(currentPath)"))
 
         // C 문자열 포인터를 ghostty_surface_new 호출 전까지 유지해야 함
         // withCString 중첩 대신, 명시적으로 strdup하여 수명을 관리
