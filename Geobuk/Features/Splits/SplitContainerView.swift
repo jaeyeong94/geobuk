@@ -226,8 +226,8 @@ struct SplitPaneView: View {
                                 surfaceView.sendKeyPress(keyCode: 8, char: "c", mods: GHOSTTY_MODS_CTRL)
                             }
                         )
-                        .opacity(isRunning ? 0 : 1)
-                        .frame(height: isRunning ? 0 : nil)
+                        .opacity(isRunning || expandedTeammateSurfaceId != nil ? 0 : 1)
+                        .frame(height: isRunning || expandedTeammateSurfaceId != nil ? 0 : nil)
                         .animation(.easeInOut(duration: 0.15), value: isRunning)
 
                         // 팀원 미니 터미널 바 (리더 패널일 때만 표시)
