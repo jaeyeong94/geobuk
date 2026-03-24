@@ -141,8 +141,10 @@ struct SplitPaneView: View {
                             Group {
                                 if let expandedSV {
                                     TerminalSurfaceRepresentable(surfaceView: expandedSV)
+                                        .id("team-\(expandedTeammateSurfaceId ?? "")")
                                 } else {
                                     TerminalSurfaceRepresentable(surfaceView: surfaceView)
+                                        .id("leader-\(surfaceView.viewId)")
                                 }
                             }
                             .onAppear {
