@@ -61,6 +61,28 @@ extension NSEvent {
     }
 }
 
+// MARK: - NSEvent.buttonNumber → ghostty_mouse_button_e 변환
+
+extension Int {
+    /// NSEvent.buttonNumber를 Ghostty 마우스 버튼으로 변환
+    var ghosttyMouseButton: ghostty_input_mouse_button_e {
+        switch self {
+        case 0: return GHOSTTY_MOUSE_LEFT
+        case 1: return GHOSTTY_MOUSE_RIGHT
+        case 2: return GHOSTTY_MOUSE_MIDDLE
+        case 3: return GHOSTTY_MOUSE_EIGHT
+        case 4: return GHOSTTY_MOUSE_NINE
+        case 5: return GHOSTTY_MOUSE_SIX
+        case 6: return GHOSTTY_MOUSE_SEVEN
+        case 7: return GHOSTTY_MOUSE_FOUR
+        case 8: return GHOSTTY_MOUSE_FIVE
+        case 9: return GHOSTTY_MOUSE_TEN
+        case 10: return GHOSTTY_MOUSE_ELEVEN
+        default: return GHOSTTY_MOUSE_UNKNOWN
+        }
+    }
+}
+
 // MARK: - NSEvent.ModifierFlags → ghostty_input_mods_e 변환
 
 extension NSEvent.ModifierFlags {

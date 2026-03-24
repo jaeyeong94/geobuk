@@ -21,6 +21,33 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     /// 셸의 현재 작업 디렉토리 (OSC 7 → action_cb PWD로 업데이트)
     var currentDirectory: String?
 
+    /// 검색 상태
+    var searchActive: Bool = false
+    var searchNeedle: String = ""
+    var searchTotal: Int = -1
+    var searchSelected: Int = -1
+
+    /// 검색 종료
+    func endSearch() {
+        executeAction("end_search")
+        searchActive = false
+        searchNeedle = ""
+        searchTotal = -1
+        searchSelected = -1
+        NotificationCenter.default.post(name: .geobukSearchStateChanged, object: self)
+    }
+
+    /// 검색 쿼리 전송
+    func submitSearch(_ needle: String) {
+        searchNeedle = needle
+        executeAction("search:\(needle)")
+    }
+
+    /// 검색 결과 탐색
+    func navigateSearch(direction: String) {
+        executeAction("navigate_search:\(direction)")
+    }
+
     /// surface 존재 여부
     var hasSurface: Bool { surface != nil }
 
@@ -116,6 +143,9 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         for ptr in cKeys { free(ptr) }
         for ptr in cValues { free(ptr) }
 
+        // 드래그 & 드롭 타입 등록 (파일, URL, 텍스트)
+        registerForDraggedTypes([.string, .fileURL, .URL])
+
         GeobukLogger.debug(.terminal, "Surface created", context: ["viewId": viewId.uuidString])
     }
 
@@ -198,6 +228,8 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
 
         for ptr in cKeys { free(ptr) }
         for ptr in cValues { free(ptr) }
+
+        registerForDraggedTypes([.string, .fileURL, .URL])
 
         GeobukLogger.debug(.terminal, "Surface created (inherited config)", context: ["viewId": viewId.uuidString])
     }
@@ -345,6 +377,17 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
                 NotificationCenter.default.post(name: .teamCollapseExpanded, object: nil)
                 return true
             }
+        }
+
+        // Cmd+F: 터미널 내 검색 토글 (직접 상태 변경 — Ghostty 왕복 없이 즉시 반응)
+        if event.modifierFlags.contains(.command) && event.keyCode == 3 {
+            if searchActive {
+                endSearch()
+            } else {
+                searchActive = true
+                NotificationCenter.default.post(name: .geobukSearchStateChanged, object: self)
+            }
+            return true
         }
 
         // Command 키 조합은 항상 메뉴 시스템으로 전달
@@ -565,6 +608,22 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         super.rightMouseUp(with: event)
     }
 
+    override func otherMouseDown(with event: NSEvent) {
+        guard let surface else { return }
+        let mods = event.modifierFlags.ghosttyMods
+        ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, event.buttonNumber.ghosttyMouseButton, mods)
+    }
+
+    override func otherMouseUp(with event: NSEvent) {
+        guard let surface else { return }
+        let mods = event.modifierFlags.ghosttyMods
+        ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, event.buttonNumber.ghosttyMouseButton, mods)
+    }
+
+    override func otherMouseDragged(with event: NSEvent) {
+        mouseMoved(with: event)
+    }
+
     override func mouseMoved(with event: NSEvent) {
         guard let surface else { return }
         let pos = convert(event.locationInWindow, from: nil)
@@ -641,6 +700,57 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         executeAction("paste_from_clipboard")
     }
 
+    // MARK: - Drag & Drop
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        let validTypes: Set<NSPasteboard.PasteboardType> = [.string, .fileURL, .URL]
+        guard let types = sender.draggingPasteboard.types,
+              !Set(types).isDisjoint(with: validTypes) else { return [] }
+        return .copy
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        guard let surface else { return false }
+        let pb = sender.draggingPasteboard
+
+        let text: String
+        if let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL], !urls.isEmpty {
+            // 파일/URL 드롭: 셸 이스케이프 처리
+            text = urls.map { url in
+                if url.isFileURL {
+                    return Self.shellEscape(url.path)
+                } else {
+                    return url.absoluteString
+                }
+            }.joined(separator: " ")
+        } else if let str = pb.string(forType: .string) {
+            // 텍스트 드롭: 그대로 전달
+            text = str
+        } else {
+            return false
+        }
+
+        text.withCString { ptr in
+            ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
+        }
+        return true
+    }
+
+    /// 셸 특수 문자를 백슬래시로 이스케이프
+    private static func shellEscape(_ path: String) -> String {
+        var result = ""
+        let specialChars: Set<Character> = [" ", "(", ")", "[", "]", "{", "}", "<", ">",
+                                             "\"", "'", "`", "!", "#", "$", "&", ";", "|",
+                                             "*", "?", "\\", "\t"]
+        for char in path {
+            if specialChars.contains(char) {
+                result.append("\\")
+            }
+            result.append(char)
+        }
+        return result
+    }
+
     // MARK: - Text Input
 
     /// 터미널에 텍스트를 직접 전송한다 (프로그래밍 방식으로 명령 입력 시 사용)
@@ -682,10 +792,11 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     // MARK: - Binding Actions
 
     /// Ghostty 내장 액션 실행 (예: "increase_font_size:1", "reset_font_size")
-    func executeAction(_ action: String) {
-        guard let surface else { return }
-        action.withCString { ptr in
-            _ = ghostty_surface_binding_action(surface, ptr, UInt(action.utf8.count))
+    @discardableResult
+    func executeAction(_ action: String) -> Bool {
+        guard let surface else { return false }
+        return action.withCString { ptr in
+            ghostty_surface_binding_action(surface, ptr, UInt(action.utf8.count))
         }
     }
 

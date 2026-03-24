@@ -66,6 +66,9 @@ struct SplitPaneView: View {
     /// 명령 실행 중 (SwiftUI 반응용 — surfaceView.isCommandRunning과 동기화)
     @State private var isRunning = false
 
+    /// 검색 오버레이 표시 (SwiftUI 반응용 — surfaceView.searchActive와 동기화)
+    @State private var isSearching = false
+
     /// 확대 표시 중인 팀원 surfaceId (nil이면 리더 표시)
     @State private var expandedTeammateSurfaceId: String? = nil
 
@@ -172,6 +175,13 @@ struct SplitPaneView: View {
                                 }
                                 isRunning = surfaceView.isCommandRunning
                                 currentDir = surfaceView.currentDirectory
+                            }
+
+                            // 터미널 내 검색 오버레이 (좌측 상단 — 우측의 X 버튼과 겹치지 않도록)
+                            if isSearching {
+                                TerminalSearchOverlay(surfaceView: surfaceView)
+                                    .transition(.move(edge: .top).combined(with: .opacity))
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                             }
 
                             // 패널 닫기 버튼 (우측 상단, 포커스 시에만 표시)
@@ -439,6 +449,13 @@ struct SplitPaneView: View {
                 // 빠른 명령 — CWD만 갱신
                 currentDir = surfaceView.currentDirectory
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .geobukSearchStateChanged)) { notification in
+            guard case .terminal = content,
+                  let surfaceView = surfaceViewProvider(content.id),
+                  let sv = notification.object as? GhosttySurfaceView,
+                  sv.viewId == surfaceView.viewId else { return }
+            isSearching = sv.searchActive
         }
     }
 }

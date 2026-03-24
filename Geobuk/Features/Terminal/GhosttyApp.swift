@@ -142,6 +142,78 @@ final class GhosttyApp {
                 return true
             }
 
+            // 검색 시작
+            if action.tag == GHOSTTY_ACTION_START_SEARCH {
+                if target.tag == GHOSTTY_TARGET_SURFACE {
+                    let surface = target.target.surface
+                    if let userdata = ghostty_surface_userdata(surface) {
+                        let needlePtr = action.action.start_search.needle
+                        let needle = needlePtr != nil ? String(cString: needlePtr!) : ""
+                        DispatchQueue.main.async {
+                            guard ghostty_surface_userdata(surface) != nil else { return }
+                            let sv = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
+                            guard sv.hasSurface else { return }
+                            sv.searchActive = true
+                            if !needle.isEmpty { sv.searchNeedle = needle }
+                            NotificationCenter.default.post(name: .geobukSearchStateChanged, object: sv)
+                        }
+                    }
+                }
+                return true
+            }
+
+            // 검색 종료
+            if action.tag == GHOSTTY_ACTION_END_SEARCH {
+                if target.tag == GHOSTTY_TARGET_SURFACE {
+                    let surface = target.target.surface
+                    if let userdata = ghostty_surface_userdata(surface) {
+                        DispatchQueue.main.async {
+                            guard ghostty_surface_userdata(surface) != nil else { return }
+                            let sv = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
+                            sv.searchActive = false
+                            sv.searchTotal = -1
+                            sv.searchSelected = -1
+                            NotificationCenter.default.post(name: .geobukSearchStateChanged, object: sv)
+                        }
+                    }
+                }
+                return true
+            }
+
+            // 검색 결과 수 업데이트
+            if action.tag == GHOSTTY_ACTION_SEARCH_TOTAL {
+                if target.tag == GHOSTTY_TARGET_SURFACE {
+                    let surface = target.target.surface
+                    if let userdata = ghostty_surface_userdata(surface) {
+                        let total = action.action.search_total.total
+                        DispatchQueue.main.async {
+                            guard ghostty_surface_userdata(surface) != nil else { return }
+                            let sv = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
+                            sv.searchTotal = Int(total)
+                            NotificationCenter.default.post(name: .geobukSearchStateChanged, object: sv)
+                        }
+                    }
+                }
+                return true
+            }
+
+            // 검색 현재 선택 인덱스 업데이트
+            if action.tag == GHOSTTY_ACTION_SEARCH_SELECTED {
+                if target.tag == GHOSTTY_TARGET_SURFACE {
+                    let surface = target.target.surface
+                    if let userdata = ghostty_surface_userdata(surface) {
+                        let selected = action.action.search_selected.selected
+                        DispatchQueue.main.async {
+                            guard ghostty_surface_userdata(surface) != nil else { return }
+                            let sv = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
+                            sv.searchSelected = Int(selected)
+                            NotificationCenter.default.post(name: .geobukSearchStateChanged, object: sv)
+                        }
+                    }
+                }
+                return true
+            }
+
             return false
         }
         runtimeConfig.read_clipboard_cb = { userdata, location, state in

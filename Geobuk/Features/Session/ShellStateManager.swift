@@ -96,6 +96,8 @@ extension Notification.Name {
     static let geobukShellPromptReady = Notification.Name("geobukShellPromptReady")
     /// 셸이 명령 실행을 시작할 때 발생 (userInfo: ["surfaceId": String, "command": String])
     static let geobukShellCommandStarted = Notification.Name("geobukShellCommandStarted")
+    /// 터미널 검색 상태 변경 (검색 시작/종료/결과 업데이트)
+    static let geobukSearchStateChanged = Notification.Name("geobukSearchStateChanged")
 }
 
 extension ShellStateManager {
