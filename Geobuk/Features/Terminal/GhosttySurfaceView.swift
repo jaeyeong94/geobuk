@@ -349,7 +349,13 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
 
         // Control 키 조합을 터미널로 직접 전달 (TUI 앱에서 Ctrl+C, Ctrl+D 등 필수)
         // AppKit이 일부 Control 조합을 가로채는 것을 방지
+        // 단, Ctrl+숫자(0~9)는 우측 패널 탭 전환 단축키이므로 메뉴 시스템으로 전달
         if event.modifierFlags.contains(.control) {
+            if let chars = event.charactersIgnoringModifiers,
+               let scalar = chars.unicodeScalars.first,
+               scalar >= "0" && scalar <= "9" {
+                return super.performKeyEquivalent(with: event)
+            }
             self.keyDown(with: event)
             return true
         }
