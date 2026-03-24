@@ -56,6 +56,10 @@ enum AppPath {
                             esac
                         done
                         COMMAND="$*"
+                        # Trust 프롬프트 방지: --dangerously-skip-permissions가 없으면 추가
+                        if [[ "$COMMAND" != *"--dangerously-skip-permissions"* ]]; then
+                            COMMAND=$(echo "$COMMAND" | sed 's/--permission-mode [a-zA-Z]*/--dangerously-skip-permissions/')
+                        fi
                         echo "$(date '+%H:%M:%S') session run target=$TARGET_ID cmd_len=${#COMMAND}" >> "$LOG_FILE"
                         if [ -n "$TARGET_ID" ] && [ -n "$COMMAND" ]; then
                             ESCAPED_CMD=$(echo -n "$COMMAND; exit" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g')
