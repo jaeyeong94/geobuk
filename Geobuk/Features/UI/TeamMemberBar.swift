@@ -56,17 +56,17 @@ struct TeamMemberLabel: View {
     let isExpanded: Bool
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             Circle()
                 .fill(TeamMemberMiniTerminal.colorForAgent(color))
-                .frame(width: 6, height: 6)
+                .frame(width: 8, height: 8)
             Text(name)
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .foregroundColor(.primary.opacity(0.7))
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundColor(.primary.opacity(0.8))
                 .lineLimit(1)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 4)
                 .fill(isExpanded
