@@ -30,7 +30,8 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     // MARK: - Initialization
 
     /// GhosttyApp으로부터 새 surface 생성
-    init(app: GhosttyApp, cwd: String? = nil, command: String? = nil) {
+    /// skipBlockMode: true이면 ZDOTDIR 미적용 (Team 패널 등 일반 셸 사용)
+    init(app: GhosttyApp, cwd: String? = nil, command: String? = nil, skipBlockMode: Bool = false) {
         self.ghosttyApp = app
         // 초기 프레임을 0이 아닌 크기로 설정하여 빈 화면 방지
         // Metal 렌더링이 시작될 때 유효한 크기가 필요함
@@ -54,12 +55,15 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         var envVarDefs: [(String, String)] = [
             ("GEOBUK_SURFACE_ID", viewId.uuidString),
             ("GEOBUK_SOCKET_PATH", SocketServer.defaultSocketPath),
-            // ZDOTDIR로 커스텀 .zshrc 로드 → 프롬프트 테마 비활성화
-            ("ZDOTDIR", BlockModeZshSetup.zdotdir),
             // Claude Code Team split-pane: iTerm2 백엔드로 인식시킴
             ("TERM_PROGRAM", "iTerm.app"),
             ("ITERM_SESSION_ID", "geobuk-\(viewId.uuidString)"),
         ]
+
+        // 일반 패널은 ZDOTDIR로 블록 모드 셸 사용, Team 패널은 일반 셸
+        if !skipBlockMode {
+            envVarDefs.append(("ZDOTDIR", BlockModeZshSetup.zdotdir))
+        }
 
         // it2 shim을 PATH 앞에 배치 (실제 iTerm2의 it2보다 먼저 실행)
         let currentPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"

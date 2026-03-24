@@ -60,11 +60,18 @@ enum AppPath {
                         if [[ "$COMMAND" != *"--dangerously-skip-permissions"* ]]; then
                             COMMAND=$(echo "$COMMAND" | sed 's/--permission-mode [a-zA-Z]*/--dangerously-skip-permissions/')
                         fi
-                        echo "$(date '+%H:%M:%S') session run target=$TARGET_ID cmd_len=${#COMMAND}" >> "$LOG_FILE"
+                        # 팀원 메타데이터 파싱
+                        AGENT_NAME=$(echo "$COMMAND" | sed -n 's/.*--agent-name \\([^ ]*\\).*/\\1/p')
+                        AGENT_COLOR=$(echo "$COMMAND" | sed -n 's/.*--agent-color \\([^ ]*\\).*/\\1/p')
+                        echo "$(date '+%H:%M:%S') session run target=$TARGET_ID name=$AGENT_NAME color=$AGENT_COLOR cmd_len=${#COMMAND}" >> "$LOG_FILE"
                         if [ -n "$TARGET_ID" ] && [ -n "$COMMAND" ]; then
                             ESCAPED_CMD=$(echo -n "$COMMAND; exit" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g')
                             RESPONSE=$(_send_rpc "{\\"jsonrpc\\":\\"2.0\\",\\"method\\":\\"pane.sendKeys\\",\\"params\\":{\\"paneId\\":\\"$TARGET_ID\\",\\"text\\":\\"$ESCAPED_CMD\\"},\\"id\\":1}")
                             echo "$(date '+%H:%M:%S') session run response=$RESPONSE" >> "$LOG_FILE"
+                            # 팀원 등록 (TeamMemberBar 표시용)
+                            if [ -n "$AGENT_NAME" ]; then
+                                _send_rpc "{\\"jsonrpc\\":\\"2.0\\",\\"method\\":\\"pane.registerTeammate\\",\\"params\\":{\\"surfaceId\\":\\"$TARGET_ID\\",\\"name\\":\\"$AGENT_NAME\\",\\"color\\":\\"${AGENT_COLOR:-gray}\\",\\"leaderSurfaceId\\":\\"$SURFACE_ID\\"},\\"id\\":2}" > /dev/null
+                            fi
                         fi
                         exit 0
                         ;;

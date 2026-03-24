@@ -321,4 +321,6 @@ extension Notification.Name {
     static let geobukNotificationPosted = Notification.Name("geobukNotificationPosted")
     /// 패널의 알림 링 해제 (object: surfaceId String)
     static let geobukDismissRing = Notification.Name("geobukDismissRing")
+    /// 팀원 패널로 포커스 전환 요청 (object: surfaceId String)
+    static let focusTeammatPane = Notification.Name("focusTeammatPane")
 }

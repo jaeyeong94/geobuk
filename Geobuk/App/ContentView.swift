@@ -179,6 +179,14 @@ struct ContentView: View {
                     surfaceId: claudeSurfaceId
                 )
             }
+            .onReceive(NotificationCenter.default.publisher(for: .focusTeammatPane)) { notification in
+                // 팀원 카드 클릭 → 해당 패널로 포커스 전환
+                if let surfaceId = notification.object as? String,
+                   let paneEntry = surfaceViews.first(where: { $0.value.viewId.uuidString == surfaceId }) {
+                    activeManager?.setFocusedPane(id: paneEntry.key)
+                    focusSurfaceView(id: paneEntry.key, userInitiated: true)
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .geobukPWDChanged)) { notification in
                 // PWD 변경 시 포커스된 패널의 디렉토리인지 확인 후 갱신
                 if let sv = notification.object as? GhosttySurfaceView,
@@ -582,8 +590,11 @@ struct ContentView: View {
         if let newPaneId = splitManager.focusedPaneId,
            surfaceViews[newPaneId] == nil {
             // 기존 surface가 있으면 설정 상속, 없으면 기본 생성
+            // Team 패널(startInTUIMode)은 기본 init 사용 — ZDOTDIR 커스텀 없이 일반 셸
             let surfaceView: GhosttySurfaceView
-            if let existing = existingSurfaceView {
+            if startInTUIMode {
+                surfaceView = GhosttySurfaceView(app: ghosttyApp, skipBlockMode: true)
+            } else if let existing = existingSurfaceView {
                 surfaceView = GhosttySurfaceView(app: ghosttyApp, inheritFrom: existing)
             } else {
                 surfaceView = GhosttySurfaceView(app: ghosttyApp)
@@ -645,7 +656,12 @@ struct ContentView: View {
         splitManager.closeFocusedPane()
 
         if let removed = surfaceViews.removeValue(forKey: paneId) {
+            let sid = removed.viewId.uuidString
             claudeMonitor.stopMonitoring(surfaceViewId: removed.viewId)
+            // 팀원 패널이면 TeamPaneTracker에서 제거
+            TeamPaneTracker.shared.remove(surfaceId: sid)
+            // 리더 패널이면 모든 팀원 정보 제거
+            TeamPaneTracker.shared.removeAllForLeader(surfaceId: sid)
             removed.close()
         }
 

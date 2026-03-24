@@ -39,6 +39,8 @@ final class APIMethodRouter {
             return handlePaneSendKeys(request)
         case "pane.kill":
             return handlePaneKill(request)
+        case "pane.registerTeammate":
+            return handlePaneRegisterTeammate(request)
         default:
             return .error(
                 code: JSONRPCErrorCode.methodNotFound.rawValue,
@@ -339,5 +341,28 @@ final class APIMethodRouter {
                 id: request.id
             )
         }
+    }
+
+    private func handlePaneRegisterTeammate(_ request: JSONRPCRequest) -> JSONRPCResponse {
+        guard let params = request.params,
+              let surfaceId = params["surfaceId"]?.stringValue,
+              let name = params["name"]?.stringValue,
+              let color = params["color"]?.stringValue,
+              let leaderSurfaceId = params["leaderSurfaceId"]?.stringValue else {
+            return .error(
+                code: JSONRPCErrorCode.invalidParams.rawValue,
+                message: "Missing required parameters: surfaceId, name, color, leaderSurfaceId",
+                id: request.id
+            )
+        }
+
+        TeamPaneTracker.shared.register(teammate: TeamPaneTracker.Teammate(
+            surfaceId: surfaceId,
+            name: name,
+            color: color,
+            leaderSurfaceId: leaderSurfaceId
+        ))
+
+        return .success(result: .null, id: request.id)
     }
 }
