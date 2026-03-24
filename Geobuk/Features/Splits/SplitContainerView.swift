@@ -252,6 +252,13 @@ struct SplitPaneView: View {
                             }
                         }
                     }
+                    .onChange(of: mates.count) { _, _ in
+                        // 팀원이 제거되었을 때 확대 중인 팀원이 사라졌으면 리더로 복귀
+                        if let expandedId = expandedTeammateSurfaceId,
+                           !mates.contains(where: { $0.surfaceId == expandedId }) {
+                            expandedTeammateSurfaceId = nil
+                        }
+                    }
                 } else {
                     Color.black
                         .overlay {
