@@ -376,17 +376,37 @@ struct SplitPaneView: View {
             // 기존 TUI 전환 대기 취소 (빠르게 연속 입력 시)
             surfaceView.tuiTransitionTask?.cancel()
 
-            // 2초 후에도 prompt가 안 오면 TUI 모드로 전환 (느린 명령)
+            // alternate screen 폴링 + 타이머 폴백
+            // 1) 50ms 간격으로 alternate screen 감지 → 즉시 TUI 전환 (vim, htop 등)
+            // 2) 2초 경과 시 alternate screen 없어도 TUI 전환 (claude, node dev 등)
             surfaceView.tuiTransitionTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                GeobukLogger.debug(.shell, "TUI transition timer fired", context: ["surfaceId": sid, "isCancelled": "\(Task.isCancelled)", "shellRunning": "\(surfaceView.shellRunning)"])
-                guard !Task.isCancelled, surfaceView.shellRunning else { return }
+                let pollInterval: UInt64 = 50_000_000     // 50ms
+                let fallbackPolls = 20                     // 50ms × 20 = 1초 (폴백 타이머)
+                let maxPolls = 200                         // 50ms × 200 = 10초 (최대 대기)
 
-                // 아직 running → 느린 명령 (next dev, vim 등)
-                GeobukLogger.debug(.shell, "Switching to TUI mode", context: ["surfaceId": sid])
-                surfaceView.isCommandRunning = true; isRunning = true
-                surfaceView.blockInputMode = false
-                surfaceView.window?.makeFirstResponder(surfaceView)
+                for i in 0..<maxPolls {
+                    try? await Task.sleep(nanoseconds: pollInterval)
+                    guard !Task.isCancelled, surfaceView.shellRunning else { return }
+
+                    // alternate screen 감지 → 즉시 TUI 전환
+                    if let surface = surfaceView.surfaceHandle,
+                       ghostty_surface_is_alternate_screen(surface) {
+                        GeobukLogger.debug(.shell, "Alternate screen detected → TUI mode", context: ["surfaceId": sid])
+                        surfaceView.isCommandRunning = true; isRunning = true
+                        surfaceView.blockInputMode = false
+                        surfaceView.window?.makeFirstResponder(surfaceView)
+                        return
+                    }
+
+                    // 2초 경과 폴백: alternate screen 없는 TUI 앱 (claude 등)
+                    if i == fallbackPolls - 1 {
+                        GeobukLogger.debug(.shell, "Fallback timer → TUI mode", context: ["surfaceId": sid])
+                        surfaceView.isCommandRunning = true; isRunning = true
+                        surfaceView.blockInputMode = false
+                        surfaceView.window?.makeFirstResponder(surfaceView)
+                        return
+                    }
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .geobukShellPromptReady)) { notification in
