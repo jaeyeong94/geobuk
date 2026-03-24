@@ -175,7 +175,7 @@ struct ContentView: View {
                 }
             }
             .onDisappear {
-                coordinator.autoSaveTimer?.invalidate()
+                coordinator.autoSaveTask?.cancel()
                 coordinator.cleanup()
             }
     }

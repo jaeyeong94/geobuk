@@ -27,7 +27,7 @@ final class AppCoordinator {
 
     var isInitialized = false
     var errorMessage: String?
-    var autoSaveTimer: Timer?
+    var autoSaveTask: Task<Void, Never>?
     var focusedDirectory: String?
 
     /// 패널별 CWD 매핑 (복원 시 surface 생성에 사용)
@@ -182,9 +182,11 @@ final class AppCoordinator {
     // MARK: - Auto Save
 
     func startAutoSaveTimer() {
-        autoSaveTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
+        autoSaveTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { break }
+                guard let self else { break }
                 SessionPersistence.save(manager: self.workspaceManager, surfaceViews: self.surfaceViews)
             }
         }

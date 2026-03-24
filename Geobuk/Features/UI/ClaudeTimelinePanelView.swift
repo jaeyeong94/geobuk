@@ -61,7 +61,7 @@ struct ClaudeTimelinePanelView: View {
     // Timeline state
     @State private var entries: [TimelineEntry] = []
     @State private var elapsedTime: TimeInterval = 0
-    @State private var timer: Timer?
+    @State private var timerTask: Task<Void, Never>?
     @State private var lastPhase: AISessionPhase = .idle
     @State private var lastToolName: String? = nil
 
@@ -389,8 +389,10 @@ struct ClaudeTimelinePanelView: View {
     // MARK: - Timer
 
     private func startTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            Task { @MainActor in
+        timerTask = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { break }
                 if let startedAt = sessionState?.startedAt {
                     elapsedTime = Date().timeIntervalSince(startedAt)
                 } else {
@@ -401,8 +403,8 @@ struct ClaudeTimelinePanelView: View {
     }
 
     private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
+        timerTask?.cancel()
+        timerTask = nil
     }
 }
 
