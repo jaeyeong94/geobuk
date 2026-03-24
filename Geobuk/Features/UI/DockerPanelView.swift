@@ -365,31 +365,14 @@ enum DockerPanelParser {
 
 // MARK: - Process Helper (free function)
 
+/// ProcessRunner를 비동기 컨텍스트에서 사용하기 위한 래퍼.
+/// terminationHandler 안에서 readDataToEndOfFile()을 호출하는 패턴을 피해
+/// 파이프 버퍼 초과 시 발생하는 데드락을 방지한다.
 private func runProcess(_ launchPath: String, arguments: [String]) async -> (String, Int32) {
-    await withCheckedContinuation { continuation in
-        let process = Process()
-        process.launchPath = launchPath
-        process.arguments = arguments
-
-        let pipe = Pipe()
-        let errPipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = errPipe
-
-        process.terminationHandler = { p in
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-            let combined = data + errData
-            let output = String(data: combined, encoding: .utf8) ?? ""
-            continuation.resume(returning: (output, p.terminationStatus))
-        }
-
-        do {
-            try process.run()
-        } catch {
-            continuation.resume(returning: ("", -1))
-        }
-    }
+    await Task.detached(priority: .utility) {
+        let result = ProcessRunner.run(launchPath, arguments: arguments)
+        return (result.output ?? "", result.exitCode)
+    }.value
 }
 
 // MARK: - Log Sheet
