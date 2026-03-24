@@ -330,6 +330,17 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
 
+        // Esc 키: 팀원 확대 상태이면 축소
+        if event.keyCode == 53 { // 53 = Escape
+            let sid = viewId.uuidString
+            let tracker = TeamPaneTracker.shared
+            // 이 surfaceView가 확대된 팀원이거나 팀원을 가진 리더이면 축소 알림
+            if tracker.isTeammate(surfaceId: sid) || tracker.isLeader(surfaceId: sid) {
+                NotificationCenter.default.post(name: .teamCollapseExpanded, object: nil)
+                return true
+            }
+        }
+
         // Command 키 조합은 항상 메뉴 시스템으로 전달
         // (Cmd+D → Split, Cmd+T → New Tab, Cmd+W → Close 등)
         if event.modifierFlags.contains(.command) {
@@ -350,6 +361,8 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         guard !blockInputMode else { return }
         guard let surface else { return }
 
+        let action = event.isARepeat ? GHOSTTY_ACTION_REPEAT : GHOSTTY_ACTION_PRESS
+
         // Ghostty 패턴: keyDown 중에만 accumulator 활성화
         keyTextAccumulator = []
         defer { keyTextAccumulator = nil }
@@ -363,17 +376,44 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         syncPreedit(clearIfNeeded: markedTextBefore)
 
         if let list = keyTextAccumulator, !list.isEmpty {
-            // 조합 완료된 텍스트 전달
+            // 조합 완료된 텍스트를 키 이벤트에 첨부하여 원자적으로 전달
+            // ghostty_surface_text를 별도로 쓰면 PRESS 없이 텍스트만 전달되어
+            // keyUp의 RELEASE와 쌍이 안 맞아 빠른 타이핑 시 텍스트 소실 발생
             for text in list {
-                text.withCString { ptr in
-                    ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
-                }
+                _ = sendKeyWithText(action, event: event, text: text)
             }
         } else {
             // 일반 키 이벤트 (화살표, Enter, Backspace 등)
-            var keyEvent = event.ghosttyKeyEvent(action: GHOSTTY_ACTION_PRESS)
-            keyEvent.composing = markedText.length > 0 || markedTextBefore
-            _ = ghostty_surface_key(surface, keyEvent)
+            _ = sendKeyWithText(
+                action,
+                event: event,
+                text: event.characters,
+                composing: markedText.length > 0 || markedTextBefore
+            )
+        }
+    }
+
+    /// 키 이벤트와 텍스트를 ghostty_surface_key로 원자적으로 전달
+    /// Ghostty 코어가 PRESS/RELEASE 쌍을 올바르게 추적할 수 있도록 보장
+    private func sendKeyWithText(
+        _ action: ghostty_input_action_e,
+        event: NSEvent,
+        text: String? = nil,
+        composing: Bool = false
+    ) -> Bool {
+        guard let surface else { return false }
+        var keyEvent = event.ghosttyKeyEvent(action: action)
+        keyEvent.composing = composing
+
+        // 제어 문자(< 0x20)는 텍스트를 첨부하지 않음 — Ghostty가 자체 인코딩
+        if let text, !text.isEmpty,
+           let codepoint = text.utf8.first, codepoint >= 0x20 {
+            return text.withCString { ptr in
+                keyEvent.text = ptr
+                return ghostty_surface_key(surface, keyEvent)
+            }
+        } else {
+            return ghostty_surface_key(surface, keyEvent)
         }
     }
 
