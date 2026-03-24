@@ -78,6 +78,9 @@ struct SplitPaneView: View {
     /// 현재 작업 디렉토리 (surfaceView.currentDirectory를 SwiftUI에서 추적)
     @State private var currentDir: String? = nil
 
+    /// 원격 접속 정보 (SSH 세션일 때 user@host 형태)
+    @State private var remoteHost: String? = nil
+
     /// 알림 링 투명도 (애니메이션용)
     @State private var ringOpacity: Double = 0
 
@@ -240,8 +243,8 @@ struct SplitPaneView: View {
                                 set: { surfaceView.pendingInputText = $0 }
                             ),
                             currentDirectory: currentDir,
+                            remoteHost: remoteHost,
                             onSubmit: { command in
-                                // 명령만 전송. 모드 전환은 소켓 알림 기반으로 처리
                                 surfaceView.sendText(command)
                                 surfaceView.sendKeyPress(keyCode: 36, char: "\r")
                             },
@@ -386,35 +389,86 @@ struct SplitPaneView: View {
             // 기존 TUI 전환 대기 취소 (빠르게 연속 입력 시)
             surfaceView.tuiTransitionTask?.cancel()
 
+            // SSH 감지: 블록 모드 유지 + alternate screen 폴링만 (폴백 타이머 없음)
+            let isSSH = Self.isSSHCommand(cmd)
+
+            // SSH 감지 즉시 원격 호스트 정보 설정 (Task 밖에서 → SwiftUI 즉시 반영)
+            if isSSH {
+                remoteHost = Self.parseSSHHost(cmd)
+                GeobukLogger.debug(.shell, "SSH detected", context: ["remoteHost": remoteHost ?? "nil", "command": cmd])
+            }
+
             // alternate screen 폴링 + 타이머 폴백
             // 1) 50ms 간격으로 alternate screen 감지 → 즉시 TUI 전환 (vim, htop 등)
-            // 2) 2초 경과 시 alternate screen 없어도 TUI 전환 (claude, node dev 등)
+            // 2) SSH가 아닌 경우: 1초 경과 시 alternate screen 없어도 TUI 전환 (claude 등)
+            // 3) SSH인 경우: alternate screen만으로 전환 판단 (블록 모드 유지)
             surfaceView.tuiTransitionTask = Task { @MainActor in
                 let pollInterval: UInt64 = 50_000_000     // 50ms
                 let fallbackPolls = 20                     // 50ms × 20 = 1초 (폴백 타이머)
                 let maxPolls = 200                         // 50ms × 200 = 10초 (최대 대기)
 
-                for i in 0..<maxPolls {
-                    try? await Task.sleep(nanoseconds: pollInterval)
+                if isSSH {
+                    // SSH 접속 대기 후 원격 셸에 OSC 7 보고 설정 주입
+                    // 1.5초 대기: SSH 핸드셰이크 + 셸 시작 시간
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
                     guard !Task.isCancelled, surfaceView.shellRunning else { return }
 
-                    // alternate screen 감지 → 즉시 TUI 전환
-                    if let surface = surfaceView.surfaceHandle,
-                       ghostty_surface_is_alternate_screen(surface) {
-                        GeobukLogger.debug(.shell, "Alternate screen detected → TUI mode", context: ["surfaceId": sid])
-                        surfaceView.isCommandRunning = true; isRunning = true
-                        surfaceView.blockInputMode = false
-                        surfaceView.window?.makeFirstResponder(surfaceView)
-                        return
-                    }
+                    // 원격 셸에 PROMPT_COMMAND + 프롬프트 숨김 설정
+                    // PS1='' → 원격 프롬프트 완전 숨김 (블록 입력이 대신함)
+                    // 웰컴 메시지는 유지 — clear 하지 않음
+                    // \033[1A\033[2K → 커서 위로 + 줄 삭제 (이 명령 자체의 흔적 제거)
+                    let injection = "export PROMPT_COMMAND='printf \"\\033]7;file://$(hostname)$(pwd)\\007\"'; PS1=''; printf '\\033[1A\\033[2K'"
+                    surfaceView.sendText(injection)
+                    surfaceView.sendKeyPress(keyCode: 36, char: "\r") // Enter
 
-                    // 2초 경과 폴백: alternate screen 없는 TUI 앱 (claude 등)
-                    if i == fallbackPolls - 1 {
-                        GeobukLogger.debug(.shell, "Fallback timer → TUI mode", context: ["surfaceId": sid])
-                        surfaceView.isCommandRunning = true; isRunning = true
-                        surfaceView.blockInputMode = false
-                        surfaceView.window?.makeFirstResponder(surfaceView)
-                        return
+                    // SSH 모드: alternate screen 감지 시에만 TUI 전환
+                    // SSH 세션 동안 계속 폴링 (precmd가 올 때까지)
+                    var wasAlternate = false
+                    while !Task.isCancelled && surfaceView.shellRunning {
+                        try? await Task.sleep(nanoseconds: pollInterval)
+                        guard !Task.isCancelled, surfaceView.shellRunning else { return }
+
+                        let isAlt = surfaceView.surfaceHandle.map {
+                            ghostty_surface_is_alternate_screen($0)
+                        } ?? false
+
+                        if isAlt && !wasAlternate {
+                            // 원격 TUI 앱 시작 → TUI 모드
+                            GeobukLogger.debug(.shell, "SSH: alternate screen ON → TUI mode", context: ["surfaceId": sid])
+                            surfaceView.isCommandRunning = true; isRunning = true
+                            surfaceView.blockInputMode = false
+                            surfaceView.window?.makeFirstResponder(surfaceView)
+                        } else if !isAlt && wasAlternate {
+                            // 원격 TUI 앱 종료 → 블록 모드 복귀
+                            GeobukLogger.debug(.shell, "SSH: alternate screen OFF → block mode", context: ["surfaceId": sid])
+                            surfaceView.isCommandRunning = false; isRunning = false
+                            surfaceView.blockInputMode = true
+                            inputFocusTrigger.toggle()
+                        }
+                        wasAlternate = isAlt
+                    }
+                } else {
+                    // 일반 명령: alternate screen 감지 + 폴백 타이머
+                    for i in 0..<maxPolls {
+                        try? await Task.sleep(nanoseconds: pollInterval)
+                        guard !Task.isCancelled, surfaceView.shellRunning else { return }
+
+                        if let surface = surfaceView.surfaceHandle,
+                           ghostty_surface_is_alternate_screen(surface) {
+                            GeobukLogger.debug(.shell, "Alternate screen detected → TUI mode", context: ["surfaceId": sid])
+                            surfaceView.isCommandRunning = true; isRunning = true
+                            surfaceView.blockInputMode = false
+                            surfaceView.window?.makeFirstResponder(surfaceView)
+                            return
+                        }
+
+                        if i == fallbackPolls - 1 {
+                            GeobukLogger.debug(.shell, "Fallback timer → TUI mode", context: ["surfaceId": sid])
+                            surfaceView.isCommandRunning = true; isRunning = true
+                            surfaceView.blockInputMode = false
+                            surfaceView.window?.makeFirstResponder(surfaceView)
+                            return
+                        }
                     }
                 }
             }
@@ -428,6 +482,9 @@ struct SplitPaneView: View {
 
             GeobukLogger.debug(.shell, "SplitPaneView received promptReady", context: ["surfaceId": sid, "wasRunning": "\(surfaceView.isCommandRunning)", "apiCreated": "\(surfaceView.apiCreatedPane)", "cwd": surfaceView.currentDirectory ?? "nil"])
             surfaceView.shellRunning = false
+
+            // SSH 종료 → 원격 호스트 정보 초기화
+            remoteHost = nil
 
             // TUI 전환 대기 취소 (빠른 명령이 완료됨)
             surfaceView.tuiTransitionTask?.cancel()
@@ -450,6 +507,14 @@ struct SplitPaneView: View {
                 currentDir = surfaceView.currentDirectory
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .geobukPWDChanged)) { notification in
+            // OSC 7로 경로가 변경될 때 (SSH 원격 cd 포함) 즉시 반영
+            guard case .terminal = content,
+                  let surfaceView = surfaceViewProvider(content.id),
+                  let sv = notification.object as? GhosttySurfaceView,
+                  sv.viewId == surfaceView.viewId else { return }
+            currentDir = sv.currentDirectory
+        }
         .onReceive(NotificationCenter.default.publisher(for: .geobukSearchStateChanged)) { notification in
             guard case .terminal = content,
                   let surfaceView = surfaceViewProvider(content.id),
@@ -457,6 +522,41 @@ struct SplitPaneView: View {
                   sv.viewId == surfaceView.viewId else { return }
             isSearching = sv.searchActive
         }
+    }
+
+    /// 명령어가 SSH 세션인지 판별
+    private static func isSSHCommand(_ command: String) -> Bool {
+        let trimmed = command.trimmingCharacters(in: .whitespaces)
+        let first = trimmed.split(separator: " ", maxSplits: 1).first.map(String.init) ?? trimmed
+        return ["ssh", "scp", "sftp", "mosh"].contains(first)
+    }
+
+    /// SSH 명령에서 user@host 또는 host를 파싱
+    /// 예: "ssh user@host", "ssh -p 22 user@host", "ssh host"
+    private static func parseSSHHost(_ command: String) -> String? {
+        let parts = command.trimmingCharacters(in: .whitespaces)
+            .split(separator: " ")
+            .map(String.init)
+        guard parts.first == "ssh" || parts.first == "mosh" else { return nil }
+
+        // 옵션을 건너뛰고 호스트 인자를 찾음
+        // -p, -i, -o, -l, -L, -R, -D, -J 등은 다음 인자가 값
+        let optionsWithValue: Set<String> = ["-p", "-i", "-o", "-l", "-L", "-R", "-D", "-J", "-F", "-b", "-c", "-e", "-m", "-w", "-W"]
+        var i = 1
+        while i < parts.count {
+            let part = parts[i]
+            if part.hasPrefix("-") {
+                if optionsWithValue.contains(part) {
+                    i += 2 // 옵션 + 값 건너뛰기
+                } else {
+                    i += 1 // 플래그만 건너뛰기
+                }
+            } else {
+                // 옵션이 아닌 첫 인자 = 호스트
+                return part
+            }
+        }
+        return nil
     }
 }
 

@@ -42,6 +42,9 @@ struct BlockInputBar: View {
     /// 셸의 현재 작업 디렉토리
     let currentDirectory: String?
 
+    /// 원격 접속 정보 (SSH 세션일 때 user@host 형태, nil이면 로컬)
+    var remoteHost: String? = nil
+
     /// 명령어 제출 콜백 (PTY로 전송)
     let onSubmit: (String) -> Void
 
@@ -186,15 +189,31 @@ struct BlockInputBar: View {
 
     private var contextLine: some View {
         HStack(spacing: 6) {
-            Text(NSUserName())
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundColor(.green)
+            if let remote = remoteHost {
+                // 원격 세션: remote 뱃지 + user@host
+                Text("remote")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Color.orange.opacity(0.8))
+                    .cornerRadius(3)
+
+                Text(remote)
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundColor(.yellow)
+            } else {
+                // 로컬 세션: 유저명
+                Text(NSUserName())
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundColor(.green)
+            }
 
             Text("\u{203A}") // ›
                 .foregroundColor(.secondary)
 
             if let dir = currentDirectory {
-                Text(PathAbbreviator.abbreviate(dir))
+                Text(remoteHost != nil ? dir : PathAbbreviator.abbreviate(dir))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.blue)
                     .lineLimit(1)
