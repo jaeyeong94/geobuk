@@ -551,9 +551,7 @@ final class SystemMonitor {
     // MARK: - Listening Ports
 
     private func updateListeningPorts() async {
-        let ports = await Task.detached(priority: .utility) {
-            SystemMonitor.fetchListeningPorts()
-        }.value
+        let ports = await SystemMonitor.fetchListeningPorts()
         listeningPorts = ports
     }
 
@@ -564,8 +562,8 @@ final class SystemMonitor {
         "CommCenter", "syncdefaultsd"
     ]
 
-    /// lsof로 리스닝 포트 목록을 읽는다 (nonisolated — 백그라운드 태스크에서 호출 가능)
-    nonisolated static func fetchListeningPorts() -> [PortInfo] {
+    /// lsof로 리스닝 포트 목록을 읽는다 (async — cooperative thread pool 블로킹 없음)
+    nonisolated static func fetchListeningPorts() async -> [PortInfo] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
         process.arguments = ["-nP", "-iTCP", "-sTCP:LISTEN"]
@@ -576,14 +574,35 @@ final class SystemMonitor {
 
         do {
             try process.run()
-            process.waitUntilExit()
         } catch {
             return []
         }
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { return [] }
+        // withCheckedContinuation + terminationHandler로 블로킹 없이 종료 대기
+        // 타임아웃(10초) 초과 시 프로세스를 종료하고 빈 배열 반환
+        let data: Data? = await withTaskGroup(of: Data?.self) { group in
+            group.addTask {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Data?, Never>) in
+                    process.terminationHandler = { _ in
+                        let output = pipe.fileHandleForReading.readDataToEndOfFile()
+                        continuation.resume(returning: output)
+                    }
+                }
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(10))
+                return nil
+            }
+            // 먼저 완료된 결과를 반환하고 나머지 취소
+            let result = await group.next() ?? nil
+            group.cancelAll()
+            if result == nil {
+                process.terminate()
+            }
+            return result
+        }
 
+        guard let data, let output = String(data: data, encoding: .utf8) else { return [] }
         return parseLsofPortOutput(output)
     }
 
