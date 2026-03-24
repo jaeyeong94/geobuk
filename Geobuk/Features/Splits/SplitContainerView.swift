@@ -239,9 +239,11 @@ struct SplitPaneView: View {
                                 leaderSurfaceId: surfaceView.viewId.uuidString
                             ) { selectedSurfaceId in
                                 withAnimation(.easeInOut(duration: 0.15)) {
-                                    if expandedTeammateSurfaceId == selectedSurfaceId || selectedSurfaceId == surfaceView.viewId.uuidString {
+                                    if selectedSurfaceId == surfaceView.viewId.uuidString {
+                                        // 리더 카드 클릭 → 리더로 복귀
                                         expandedTeammateSurfaceId = nil
                                     } else {
+                                        // 팀원 카드 클릭 → 해당 팀원으로 전환 (이미 확대 중이어도 다른 팀원으로 전환)
                                         expandedTeammateSurfaceId = selectedSurfaceId
                                     }
                                 }
