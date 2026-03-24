@@ -66,6 +66,9 @@ struct SplitPaneView: View {
     /// 명령 실행 중 (SwiftUI 반응용 — surfaceView.isCommandRunning과 동기화)
     @State private var isRunning = false
 
+    /// 확대 표시 중인 팀원 surfaceId (nil이면 리더 표시)
+    @State private var expandedTeammateSurfaceId: String? = nil
+
     /// 입력창 포커스 트리거 (토글할 때마다 포커스)
     @State private var inputFocusTrigger = false
 
@@ -130,11 +133,18 @@ struct SplitPaneView: View {
             switch content {
             case .terminal:
                 if let surfaceView = surfaceViewProvider(content.id) {
+                    let mates = TeamPaneTracker.shared.teammates(for: surfaceView.viewId.uuidString)
+                    let expandedSV = expandedTeammateSurfaceId.flatMap { TeamPaneTracker.shared.teamSurfaceViews[$0] }
+
                     VStack(spacing: 0) {
                         ZStack(alignment: .topTrailing) {
-                            TerminalSurfaceRepresentable(
-                                surfaceView: surfaceView
-                            )
+                            Group {
+                                if let expandedSV {
+                                    TerminalSurfaceRepresentable(surfaceView: expandedSV)
+                                } else {
+                                    TerminalSurfaceRepresentable(surfaceView: surfaceView)
+                                }
+                            }
                             .onAppear {
                                 if surfaceView.apiCreatedPane {
                                     // API로 생성된 패널은 TUI 모드 유지
@@ -221,16 +231,20 @@ struct SplitPaneView: View {
                         .animation(.easeInOut(duration: 0.15), value: isRunning)
 
                         // 팀원 미니 터미널 바 (리더 패널일 때만 표시)
-                        let mates = TeamPaneTracker.shared.teammates(for: surfaceView.viewId.uuidString)
                         if !mates.isEmpty {
                             TeamMemberBar(
                                 teammates: mates,
-                                teamSurfaceViews: TeamPaneTracker.shared.teamSurfaceViews
+                                teamSurfaceViews: TeamPaneTracker.shared.teamSurfaceViews,
+                                expandedSurfaceId: expandedTeammateSurfaceId,
+                                leaderSurfaceId: surfaceView.viewId.uuidString
                             ) { selectedSurfaceId in
-                                NotificationCenter.default.post(
-                                    name: .focusTeammatPane,
-                                    object: selectedSurfaceId
-                                )
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    if expandedTeammateSurfaceId == selectedSurfaceId || selectedSurfaceId == surfaceView.viewId.uuidString {
+                                        expandedTeammateSurfaceId = nil
+                                    } else {
+                                        expandedTeammateSurfaceId = selectedSurfaceId
+                                    }
+                                }
                             }
                         }
                     }
