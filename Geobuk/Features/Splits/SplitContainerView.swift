@@ -220,11 +220,13 @@ struct SplitPaneView: View {
                         .frame(height: isRunning ? 0 : nil)
                         .animation(.easeInOut(duration: 0.15), value: isRunning)
 
-                        // 팀원 미니 카드 바 (리더 패널일 때만 표시)
+                        // 팀원 미니 터미널 바 (리더 패널일 때만 표시)
                         let mates = TeamPaneTracker.shared.teammates(for: surfaceView.viewId.uuidString)
                         if !mates.isEmpty {
-                            TeamMemberBar(teammates: mates) { selectedSurfaceId in
-                                // 팀원 패널의 paneId를 찾아 포커스 전환
+                            TeamMemberBar(
+                                teammates: mates,
+                                teamSurfaceViews: TeamPaneTracker.shared.teamSurfaceViews
+                            ) { selectedSurfaceId in
                                 NotificationCenter.default.post(
                                     name: .focusTeammatPane,
                                     object: selectedSurfaceId

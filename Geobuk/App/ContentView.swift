@@ -64,7 +64,13 @@ struct ContentView: View {
                 onClosePane: { withAnimation(.easeInOut(duration: 0.15)) { closeFocusedPane() } },
                 onChildExited: { notification in
                     if let surfaceView = notification.object as? GhosttySurfaceView {
-                        closePane(for: surfaceView)
+                        let sid = surfaceView.viewId.uuidString
+                        // Team 팀원 패널이면 TeamPaneTracker에서 제거
+                        if TeamPaneTracker.shared.isTeammate(surfaceId: sid) {
+                            TeamPaneTracker.shared.remove(surfaceId: sid)
+                        } else {
+                            closePane(for: surfaceView)
+                        }
                     }
                 }
             ))
@@ -895,31 +901,28 @@ struct ContentView: View {
         let controller = PaneController.shared
 
         controller.onSplitPane = { [self] sourcePaneId, direction in
-            guard let splitManager = activeManager else { return nil }
+            // Team 팀원용: SplitTree에 추가하지 않고 surfaceView만 생성
+            let surfaceView = GhosttySurfaceView(app: ghosttyApp, skipBlockMode: true)
+            surfaceView.apiCreatedPane = true
+            surfaceView.blockInputMode = false
+            surfaceView.isCommandRunning = true
 
-            // sourcePaneId(surfaceId)에 해당하는 paneId 찾기
-            let sourcePaneUUID: UUID? = surfaceViews.first { _, sv in
-                sv.viewId.uuidString == sourcePaneId
-            }?.key
+            let newSurfaceId = surfaceView.viewId.uuidString
+            TeamPaneTracker.shared.teamSurfaceViews[newSurfaceId] = surfaceView
 
-            if let paneId = sourcePaneUUID {
-                splitManager.setFocusedPane(id: paneId)
-            }
-
-            // 분할 (API 생성 패널은 TUI 모드로 시작)
-            let splitDir: SplitDirection = direction == "vertical" ? .vertical : .horizontal
-            splitFocusedPane(direction: splitDir, startInTUIMode: true)
-
-            // 새로 생성된 패널의 surfaceId 반환
-            guard let newPaneId = splitManager.focusedPaneId,
-                  let newSurface = surfaceViews[newPaneId] else { return nil }
-
-            GeobukLogger.info(.app, "Pane split via API", context: ["source": sourcePaneId, "new": newSurface.viewId.uuidString])
-            return newSurface.viewId.uuidString
+            GeobukLogger.info(.app, "Team pane created", context: ["source": sourcePaneId, "new": newSurfaceId])
+            return newSurfaceId
         }
 
         controller.onSendKeys = { [self] surfaceId, text in
+            // 일반 패널에서 먼저 검색
             for (_, sv) in surfaceViews where sv.viewId.uuidString == surfaceId {
+                sv.sendText(text)
+                sv.sendKeyPress(keyCode: 36, char: "\r")
+                return true
+            }
+            // Team 팀원 패널에서 검색
+            if let sv = TeamPaneTracker.shared.teamSurfaceViews[surfaceId] {
                 sv.sendText(text)
                 sv.sendKeyPress(keyCode: 36, char: "\r")
                 return true
@@ -928,11 +931,17 @@ struct ContentView: View {
         }
 
         controller.onKillPane = { [self] surfaceId in
-            guard let paneEntry = surfaceViews.first(where: { $0.value.viewId.uuidString == surfaceId }) else {
-                return false
+            // 일반 패널
+            if let paneEntry = surfaceViews.first(where: { $0.value.viewId.uuidString == surfaceId }) {
+                closePane(id: paneEntry.key)
+                return true
             }
-            closePane(id: paneEntry.key)
-            return true
+            // Team 팀원 패널
+            if TeamPaneTracker.shared.teamSurfaceViews[surfaceId] != nil {
+                TeamPaneTracker.shared.remove(surfaceId: surfaceId)
+                return true
+            }
+            return false
         }
     }
 }
