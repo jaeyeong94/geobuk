@@ -22,6 +22,7 @@ final class AppCoordinator {
     let terminalProcessProvider: TerminalProcessProvider
     let notificationCoordinator: NotificationCoordinator
     let claudeLaunchSettings: ClaudeLaunchSettings
+    let tabCompletionProvider = TabCompletionProvider()
 
     // MARK: - State
 
@@ -136,6 +137,9 @@ final class AppCoordinator {
             claudeFileWatcher.startWatching()
 
             startAutoSaveTimer()
+
+            // Tab 완성 전용 Headless PTY 시작
+            tabCompletionProvider.start()
         } catch {
             GeobukLogger.error(.app, "App initialization failed", error: error)
             errorMessage = error.localizedDescription
@@ -196,6 +200,9 @@ final class AppCoordinator {
 
     func updateFocusedDirectory() {
         focusedDirectory = activeManager?.focusedPaneId.flatMap { surfaceViews[$0]?.currentDirectory }
+        if let cwd = focusedDirectory {
+            tabCompletionProvider.updateCwd(cwd)
+        }
     }
 
     // MARK: - Split Operations
@@ -432,6 +439,7 @@ final class AppCoordinator {
         systemMonitor.stopMonitoring()
         claudeMonitor.stopAll()
         claudeFileWatcher.stopWatching()
+        tabCompletionProvider.destroy()
         SessionPersistence.save(manager: workspaceManager, surfaceViews: surfaceViews)
         Task { await socketServer?.stop() }
         sessionManager.destroyAllSessions()

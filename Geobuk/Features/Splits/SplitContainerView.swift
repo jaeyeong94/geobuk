@@ -7,6 +7,7 @@ struct SplitContainerView: View {
     let onFocusPane: (UUID) -> Void
     let surfaceViewProvider: (UUID) -> GhosttySurfaceView?
     var notificationCoordinator: NotificationCoordinator?
+    var tabCompletionProvider: TabCompletionProvider?
     var onResizeComplete: ((UUID, CGFloat) -> Void)?
 
     var body: some View {
@@ -17,7 +18,8 @@ struct SplitContainerView: View {
                 isFocused: content.id == focusedPaneId,
                 onTap: { onFocusPane(content.id) },
                 surfaceViewProvider: surfaceViewProvider,
-                notificationCoordinator: notificationCoordinator
+                notificationCoordinator: notificationCoordinator,
+                tabCompletionProvider: tabCompletionProvider
             )
 
         case .split(let container):
@@ -33,6 +35,7 @@ struct SplitContainerView: View {
                         onFocusPane: onFocusPane,
                         surfaceViewProvider: surfaceViewProvider,
                         notificationCoordinator: notificationCoordinator,
+                        tabCompletionProvider: tabCompletionProvider,
                         onResizeComplete: onResizeComplete
                     )
                 },
@@ -43,6 +46,7 @@ struct SplitContainerView: View {
                         onFocusPane: onFocusPane,
                         surfaceViewProvider: surfaceViewProvider,
                         notificationCoordinator: notificationCoordinator,
+                        tabCompletionProvider: tabCompletionProvider,
                         onResizeComplete: onResizeComplete
                     )
                 }
@@ -59,6 +63,7 @@ struct SplitPaneView: View {
     let onTap: () -> Void
     let surfaceViewProvider: (UUID) -> GhosttySurfaceView?
     var notificationCoordinator: NotificationCoordinator?
+    var tabCompletionProvider: TabCompletionProvider?
 
     /// 셸 초기화 오버레이 표시 여부
     @State private var showInitOverlay = true
@@ -135,6 +140,32 @@ struct SplitPaneView: View {
     }
 
     /// 팀원 카드 좌우 이동 (direction: +1 다음, -1 이전)
+    /// BlockInputBar 생성 (타입 체커 부하 분산)
+    @ViewBuilder
+    private func blockInputBar(surfaceView: GhosttySurfaceView, currentDir: String?, remoteHost: String?) -> some View {
+        BlockInputBar(
+            paneFocused: isFocused,
+            focusTrigger: inputFocusTrigger,
+            persistentText: Binding(
+                get: { surfaceView.pendingInputText },
+                set: { surfaceView.pendingInputText = $0 }
+            ),
+            currentDirectory: currentDir,
+            remoteHost: remoteHost,
+            onSubmit: { command in
+                surfaceView.sendText(command)
+                surfaceView.sendKeyPress(keyCode: 36, char: "\r")
+            },
+            onTab: {
+                surfaceView.sendKeyPress(keyCode: 48, char: "\t")
+            },
+            tabCompletionProvider: tabCompletionProvider,
+            onInterrupt: {
+                surfaceView.sendKeyPress(keyCode: 8, char: "c", mods: GHOSTTY_MODS_CTRL)
+            }
+        )
+    }
+
     private func navigateTeammate(mates: [TeamPaneTracker.Teammate], direction: Int) {
         withAnimation(.easeInOut(duration: 0.15)) {
             guard !mates.isEmpty else { return }
@@ -235,28 +266,7 @@ struct SplitPaneView: View {
                             }
                         }
 
-                        BlockInputBar(
-                            paneFocused: isFocused,
-                            focusTrigger: inputFocusTrigger,
-                            persistentText: Binding(
-                                get: { surfaceView.pendingInputText },
-                                set: { surfaceView.pendingInputText = $0 }
-                            ),
-                            currentDirectory: currentDir,
-                            remoteHost: remoteHost,
-                            onSubmit: { command in
-                                surfaceView.sendText(command)
-                                surfaceView.sendKeyPress(keyCode: 36, char: "\r")
-                            },
-                            onTab: {
-                                // macOS Tab keycode = 48
-                                surfaceView.sendKeyPress(keyCode: 48, char: "\t")
-                            },
-                            onInterrupt: {
-                                // Ctrl+C: keycode 8 (c) + ctrl mod
-                                surfaceView.sendKeyPress(keyCode: 8, char: "c", mods: GHOSTTY_MODS_CTRL)
-                            }
-                        )
+                        blockInputBar(surfaceView: surfaceView, currentDir: currentDir, remoteHost: remoteHost)
                         .opacity(isRunning || expandedTeammateSurfaceId != nil ? 0 : 1)
                         .frame(height: isRunning || expandedTeammateSurfaceId != nil ? 0 : nil)
                         .animation(.easeInOut(duration: 0.15), value: isRunning)

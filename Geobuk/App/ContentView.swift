@@ -380,7 +380,8 @@ struct ContentView: View {
                     isFocused: true,
                     onTap: {},
                     surfaceViewProvider: { id in coordinator.surfaceViews[id] },
-                    notificationCoordinator: coordinator.notificationCoordinator
+                    notificationCoordinator: coordinator.notificationCoordinator,
+                    tabCompletionProvider: coordinator.tabCompletionProvider
                 )
                 .transition(.opacity)
             } else {
@@ -395,6 +396,7 @@ struct ContentView: View {
                         coordinator.surfaceViews[id]
                     },
                     notificationCoordinator: coordinator.notificationCoordinator,
+                    tabCompletionProvider: coordinator.tabCompletionProvider,
                     onResizeComplete: { containerId, ratio in
                         splitManager.resizeSplit(containerId: containerId, ratio: ratio)
                     }

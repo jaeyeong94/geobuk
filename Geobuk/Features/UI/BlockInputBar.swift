@@ -51,6 +51,9 @@ struct BlockInputBar: View {
     /// Tab 전송 콜백 (자동완성)
     let onTab: () -> Void
 
+    /// Tab 완성 프로바이더 (Headless PTY 기반, nil이면 기존 완성만 사용)
+    var tabCompletionProvider: TabCompletionProvider?
+
     /// Ctrl+C 전송 콜백 (인터럽트)
     let onInterrupt: () -> Void
 
@@ -445,23 +448,28 @@ struct BlockInputBar: View {
 
     // MARK: - Completion & Suggestions
 
-    /// 입력 변경 시 완성 후보 목록을 갱신한다 (100ms 디바운스 + 백그라운드 I/O)
+    /// 입력 변경 시 완성 후보 목록을 갱신한다 (150ms 디바운스 + Tab 완성 + 기존 완성 병합)
     private func updateCompletions(for text: String) {
         completionTask?.cancel()
         completionTask = Task {
-            // 100ms 디바운스 — 빠른 타이핑 시 이전 요청 취소
-            try? await Task.sleep(nanoseconds: 100_000_000)
+            // 150ms 디바운스 — 빠른 타이핑 시 이전 요청 취소
+            try? await Task.sleep(nanoseconds: 150_000_000)
             guard !Task.isCancelled else { return }
 
             let cwd = currentDirectory
             let history = commandHistory
 
-            // 파일 I/O를 포함한 완성 탐색을 백그라운드에서 실행
+            // Tab 완성 비동기 호출 (Headless PTY)
+            let tabResults = await tabCompletionProvider?.complete(text) ?? []
+            guard !Task.isCancelled else { return }
+
+            // 기존 완성 + Tab 결과 병합 (백그라운드)
             let candidates = await Task.detached(priority: .userInitiated) {
                 CompletionProvider.suggestAll(
                     for: text,
                     currentDirectory: cwd,
-                    history: history
+                    history: history,
+                    tabResults: tabResults
                 )
             }.value
 

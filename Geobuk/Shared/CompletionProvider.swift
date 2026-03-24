@@ -41,6 +41,7 @@ final class CompletionProvider {
         for input: String,
         currentDirectory: String?,
         history: CommandHistory,
+        tabResults: [String] = [],
         maxResults: Int = 10
     ) -> [String] {
         guard input.count >= 2 else { return [] }
@@ -53,6 +54,9 @@ final class CompletionProvider {
                 results.append(item)
             }
         }
+
+        // 0순위: 셸 Tab 완성 결과 (실제 셸이 아는 모든 것)
+        appendUnique(tabResults)
 
         // 1순위: 히스토리 기반 (최근 우선)
         appendUnique(
