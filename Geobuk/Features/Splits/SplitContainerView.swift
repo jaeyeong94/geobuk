@@ -128,6 +128,22 @@ struct SplitPaneView: View {
         }
     }
 
+    /// 팀원 카드 좌우 이동 (direction: +1 다음, -1 이전)
+    private func navigateTeammate(mates: [TeamPaneTracker.Teammate], direction: Int) {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            guard !mates.isEmpty else { return }
+
+            if let currentId = expandedTeammateSurfaceId,
+               let currentIdx = mates.firstIndex(where: { $0.surfaceId == currentId }) {
+                let nextIdx = (currentIdx + direction + mates.count) % mates.count
+                expandedTeammateSurfaceId = mates[nextIdx].surfaceId
+            } else {
+                // 확대 없는 상태 → 첫 번째(→) 또는 마지막(←) 팀원 확대
+                expandedTeammateSurfaceId = direction > 0 ? mates.first?.surfaceId : mates.last?.surfaceId
+            }
+        }
+    }
+
     var body: some View {
         ZStack {
             switch content {
@@ -253,11 +269,24 @@ struct SplitPaneView: View {
                         }
                     }
                     .onChange(of: mates.count) { _, _ in
-                        // 팀원이 제거되었을 때 확대 중인 팀원이 사라졌으면 리더로 복귀
                         if let expandedId = expandedTeammateSurfaceId,
                            !mates.contains(where: { $0.surfaceId == expandedId }) {
                             expandedTeammateSurfaceId = nil
                         }
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .teamCollapseExpanded)) { _ in
+                        guard expandedTeammateSurfaceId != nil else { return }
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            expandedTeammateSurfaceId = nil
+                        }
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .teamNavigateNext)) { _ in
+                        guard !mates.isEmpty else { return }
+                        navigateTeammate(mates: mates, direction: 1)
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .teamNavigatePrev)) { _ in
+                        guard !mates.isEmpty else { return }
+                        navigateTeammate(mates: mates, direction: -1)
                     }
                 } else {
                     Color.black

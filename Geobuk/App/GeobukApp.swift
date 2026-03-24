@@ -115,6 +115,24 @@ struct GeobukApp: App {
 
                 Divider()
 
+                // Team 패널 탐색
+                Button("Previous Teammate") {
+                    NotificationCenter.default.post(name: .teamNavigatePrev, object: nil)
+                }
+                .keyboardShortcut(.leftArrow, modifiers: .command)
+
+                Button("Next Teammate") {
+                    NotificationCenter.default.post(name: .teamNavigateNext, object: nil)
+                }
+                .keyboardShortcut(.rightArrow, modifiers: .command)
+
+                Button("Close Teammate View") {
+                    NotificationCenter.default.post(name: .teamCollapseExpanded, object: nil)
+                }
+                .keyboardShortcut(.escape, modifiers: [])
+
+                Divider()
+
                 // Cmd+1~9: Switch workspace by number
                 ForEach(1...9, id: \.self) { number in
                     Button("Workspace \(number)") {

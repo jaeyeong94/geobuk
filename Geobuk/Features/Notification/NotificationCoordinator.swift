@@ -323,4 +323,10 @@ extension Notification.Name {
     static let geobukDismissRing = Notification.Name("geobukDismissRing")
     /// 팀원 패널로 포커스 전환 요청 (object: surfaceId String)
     static let focusTeammatPane = Notification.Name("focusTeammatPane")
+    /// Team 이전 팀원으로 이동
+    static let teamNavigatePrev = Notification.Name("teamNavigatePrev")
+    /// Team 다음 팀원으로 이동
+    static let teamNavigateNext = Notification.Name("teamNavigateNext")
+    /// Team 확대된 팀원 축소 (리더로 복귀)
+    static let teamCollapseExpanded = Notification.Name("teamCollapseExpanded")
 }
