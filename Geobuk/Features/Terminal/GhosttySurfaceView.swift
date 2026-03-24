@@ -246,6 +246,28 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         // Retina 스케일 팩터 설정
         layer?.contentsScale = window.backingScaleFactor
         updateContentScale()
+
+        // 트래킹 영역 설정 — mouseMoved/mouseEntered/mouseExited 이벤트 수신에 필요
+        updateTrackingAreas()
+    }
+
+    override func updateTrackingAreas() {
+        trackingAreas.forEach { removeTrackingArea($0) }
+        addTrackingArea(NSTrackingArea(
+            rect: frame,
+            options: [
+                .mouseEnteredAndExited,
+                .mouseMoved,
+                .inVisibleRect,
+                .activeAlways,
+            ],
+            owner: self,
+            userInfo: nil
+        ))
+    }
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: currentCursor)
     }
 
     override func viewDidChangeBackingProperties() {
@@ -434,6 +456,10 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
 
     override func mouseExited(with event: NSEvent) {
         guard let surface else { return }
+
+        // 드래그 중에는 좌표를 리셋하지 않는다 — 뷰 밖으로 드래그해도 선택이 유지됨
+        if NSEvent.pressedMouseButtons != 0 { return }
+
         let mods = event.modifierFlags.ghosttyMods
         ghostty_surface_mouse_pos(surface, -1, -1, mods)
     }
@@ -499,6 +525,34 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         guard let data = text.text else { return nil }
         return String(cString: data)
     }
+
+    // MARK: - Cursor Shape
+
+    /// Ghostty 코어가 요청한 커서 모양으로 변경
+    func setCursorShape(_ shape: ghostty_action_mouse_shape_e) {
+        let cursor: NSCursor
+        switch shape {
+        case GHOSTTY_MOUSE_SHAPE_TEXT:
+            cursor = .iBeam
+        case GHOSTTY_MOUSE_SHAPE_POINTER:
+            cursor = .pointingHand
+        case GHOSTTY_MOUSE_SHAPE_EW_RESIZE:
+            cursor = .resizeLeftRight
+        case GHOSTTY_MOUSE_SHAPE_NS_RESIZE:
+            cursor = .resizeUpDown
+        case GHOSTTY_MOUSE_SHAPE_NOT_ALLOWED:
+            cursor = .operationNotAllowed
+        case GHOSTTY_MOUSE_SHAPE_CROSSHAIR:
+            cursor = .crosshair
+        default:
+            cursor = .iBeam  // 터미널에서는 기본이 I-beam
+        }
+        // 다음 resetCursorRects에서 적용되도록 캐시
+        currentCursor = cursor
+        window?.invalidateCursorRects(for: self)
+    }
+
+    private var currentCursor: NSCursor = .iBeam
 
     // MARK: - Cleanup
 

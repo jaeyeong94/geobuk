@@ -116,6 +116,32 @@ final class GhosttyApp {
                 return true
             }
 
+            // 타이핑 중 마우스 커서 숨기기
+            if action.tag == GHOSTTY_ACTION_MOUSE_VISIBILITY {
+                let visible = action.action.mouse_visibility == GHOSTTY_MOUSE_VISIBLE
+                DispatchQueue.main.async {
+                    NSCursor.setHiddenUntilMouseMoves(!visible)
+                }
+                return true
+            }
+
+            // 마우스 커서 모양 변경 (텍스트 선택 시 I-beam 등)
+            if action.tag == GHOSTTY_ACTION_MOUSE_SHAPE {
+                if target.tag == GHOSTTY_TARGET_SURFACE {
+                    let surface = target.target.surface
+                    if let userdata = ghostty_surface_userdata(surface) {
+                        let shape = action.action.mouse_shape
+                        DispatchQueue.main.async {
+                            guard ghostty_surface_userdata(surface) != nil else { return }
+                            let surfaceView = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
+                            guard surfaceView.hasSurface else { return }
+                            surfaceView.setCursorShape(shape)
+                        }
+                    }
+                }
+                return true
+            }
+
             return false
         }
         runtimeConfig.read_clipboard_cb = { userdata, location, state in
