@@ -328,11 +328,21 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.type == .keyDown else { return false }
+
         // Command 키 조합은 항상 메뉴 시스템으로 전달
         // (Cmd+D → Split, Cmd+T → New Tab, Cmd+W → Close 등)
         if event.modifierFlags.contains(.command) {
             return super.performKeyEquivalent(with: event)
         }
+
+        // Control 키 조합을 터미널로 직접 전달 (TUI 앱에서 Ctrl+C, Ctrl+D 등 필수)
+        // AppKit이 일부 Control 조합을 가로채는 것을 방지
+        if event.modifierFlags.contains(.control) {
+            self.keyDown(with: event)
+            return true
+        }
+
         return false
     }
 
@@ -376,6 +386,10 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
 
     override func flagsChanged(with event: NSEvent) {
         guard let surface else { return }
+
+        // 한글 조합(preedit) 중에는 modifier 이벤트를 무시 — 조합 상태가 깨지는 것 방지
+        if hasMarkedText() { return }
+
         // Modifier 키 변경은 press/release를 구분해야 함
         let action: ghostty_input_action_e = event.modifierFlags.contains(
             Self.modifierForKeyCode(event.keyCode)
@@ -623,7 +637,11 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     }
 
     func selectedRange() -> NSRange {
-        NSRange(location: NSNotFound, length: 0)
+        guard let surface else { return NSRange() }
+        var text = ghostty_text_s()
+        guard ghostty_surface_read_selection(surface, &text) else { return NSRange() }
+        defer { ghostty_surface_free_text(surface, &text) }
+        return NSRange(location: Int(text.offset_start), length: Int(text.offset_len))
     }
 
     func markedRange() -> NSRange {
@@ -651,7 +669,19 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     }
 
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
-        nil
+        guard let surface else { return nil }
+        guard range.length > 0 else { return nil }
+        var text = ghostty_text_s()
+        guard ghostty_surface_read_selection(surface, &text) else { return nil }
+        defer { ghostty_surface_free_text(surface, &text) }
+
+        var attributes: [NSAttributedString.Key: Any] = [:]
+        if let fontRaw = ghostty_surface_quicklook_font(surface) {
+            let font = Unmanaged<CTFont>.fromOpaque(fontRaw)
+            attributes[.font] = font.takeUnretainedValue()
+            font.release()
+        }
+        return NSAttributedString(string: String(cString: text.text), attributes: attributes)
     }
 
     func validAttributesForMarkedText() -> [NSAttributedString.Key] { [] }
