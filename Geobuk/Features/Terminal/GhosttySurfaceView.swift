@@ -363,6 +363,30 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
 
         let action = event.isARepeat ? GHOSTTY_ACTION_REPEAT : GHOSTTY_ACTION_PRESS
 
+        // Option-as-Alt: Ghostty 코어에 modifier 변환을 질의하여
+        // Option 키를 Alt로 변환할지 결정 (터미널 앱에서 Alt 시퀀스 전송 필요)
+        let translationMods = resolveTranslationMods(for: event)
+
+        // modifier가 변환되었으면 변환된 modifier로 새 이벤트 생성
+        // 한글 IME 호환: modifier가 같으면 원본 이벤트 재사용 (AppKit 내부 동등성 보존)
+        let translationEvent: NSEvent
+        if translationMods == event.modifierFlags {
+            translationEvent = event
+        } else {
+            translationEvent = NSEvent.keyEvent(
+                with: event.type,
+                location: event.locationInWindow,
+                modifierFlags: translationMods,
+                timestamp: event.timestamp,
+                windowNumber: event.windowNumber,
+                context: nil,
+                characters: event.characters(byApplyingModifiers: translationMods) ?? "",
+                charactersIgnoringModifiers: event.charactersIgnoringModifiers ?? "",
+                isARepeat: event.isARepeat,
+                keyCode: event.keyCode
+            ) ?? event
+        }
+
         // Ghostty 패턴: keyDown 중에만 accumulator 활성화
         keyTextAccumulator = []
         defer { keyTextAccumulator = nil }
@@ -370,27 +394,66 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
         // marked text 상태 기억 (composing 판별용)
         let markedTextBefore = markedText.length > 0
 
-        interpretKeyEvents([event])
+        // 키보드 레이아웃 감지: 한영 전환 시 레이아웃만 변경되는 이벤트를 무시
+        let keyboardIdBefore: String? = markedTextBefore ? nil : KeyboardLayout.id
+
+        interpretKeyEvents([translationEvent])
+
+        // 키보드 레이아웃이 변경되었으면 IME가 이벤트를 소비한 것 → 무시
+        if !markedTextBefore, let before = keyboardIdBefore, before != KeyboardLayout.id {
+            return
+        }
 
         // preedit 동기화 (한글 조합 중 상태 반영)
         syncPreedit(clearIfNeeded: markedTextBefore)
 
         if let list = keyTextAccumulator, !list.isEmpty {
             // 조합 완료된 텍스트를 키 이벤트에 첨부하여 원자적으로 전달
-            // ghostty_surface_text를 별도로 쓰면 PRESS 없이 텍스트만 전달되어
-            // keyUp의 RELEASE와 쌍이 안 맞아 빠른 타이핑 시 텍스트 소실 발생
             for text in list {
-                _ = sendKeyWithText(action, event: event, text: text)
+                _ = sendKeyWithText(
+                    action, event: event,
+                    translationMods: translationMods,
+                    text: text
+                )
             }
         } else {
             // 일반 키 이벤트 (화살표, Enter, Backspace 등)
             _ = sendKeyWithText(
-                action,
-                event: event,
-                text: event.characters,
+                action, event: event,
+                translationMods: translationMods,
+                text: translationEvent.ghosttyCharacters,
                 composing: markedText.length > 0 || markedTextBefore
             )
         }
+    }
+
+    /// Option-as-Alt 변환을 위한 modifier 해석
+    /// Ghostty 코어에 질의하여 Option을 Alt로 변환할지 결정
+    private func resolveTranslationMods(for event: NSEvent) -> NSEvent.ModifierFlags {
+        guard let surface else { return event.modifierFlags }
+
+        let translatedGhostty = ghostty_surface_key_translation_mods(
+            surface,
+            event.modifierFlags.ghosttyMods
+        )
+
+        // Ghostty가 반환한 modifier를 NSEvent.ModifierFlags로 복원
+        // 단, NSEvent의 hidden bit를 보존하기 위해 개별 플래그만 변경
+        var result = event.modifierFlags
+        let mapping: [(NSEvent.ModifierFlags, UInt32)] = [
+            (.shift, GHOSTTY_MODS_SHIFT.rawValue),
+            (.control, GHOSTTY_MODS_CTRL.rawValue),
+            (.option, GHOSTTY_MODS_ALT.rawValue),
+            (.command, GHOSTTY_MODS_SUPER.rawValue),
+        ]
+        for (flag, ghosttyFlag) in mapping {
+            if translatedGhostty.rawValue & ghosttyFlag != 0 {
+                result.insert(flag)
+            } else {
+                result.remove(flag)
+            }
+        }
+        return result
     }
 
     /// 키 이벤트와 텍스트를 ghostty_surface_key로 원자적으로 전달
@@ -398,14 +461,18 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     private func sendKeyWithText(
         _ action: ghostty_input_action_e,
         event: NSEvent,
+        translationMods: NSEvent.ModifierFlags? = nil,
         text: String? = nil,
         composing: Bool = false
     ) -> Bool {
         guard let surface else { return false }
-        var keyEvent = event.ghosttyKeyEvent(action: action)
+        var keyEvent = event.ghosttyKeyEvent(
+            action: action,
+            translationMods: translationMods
+        )
         keyEvent.composing = composing
 
-        // 제어 문자(< 0x20)는 텍스트를 첨부하지 않음 — Ghostty가 자체 인코딩
+        // 텍스트가 있고 제어문자(< 0x20)가 아니면 키 이벤트에 첨부
         if let text, !text.isEmpty,
            let codepoint = text.utf8.first, codepoint >= 0x20 {
             return text.withCString { ptr in
@@ -467,15 +534,23 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        guard let surface else { return }
+        guard let surface else { return super.rightMouseDown(with: event) }
         let mods = event.modifierFlags.ghosttyMods
-        ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_RIGHT, mods)
+        // 반환값이 true면 Ghostty 코어가 이벤트를 소비 (마우스 캡처 모드 등)
+        if ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_RIGHT, mods) {
+            return
+        }
+        // 소비되지 않으면 AppKit으로 전달 → menu(for:) 호출 → 컨텍스트 메뉴 표시
+        super.rightMouseDown(with: event)
     }
 
     override func rightMouseUp(with event: NSEvent) {
-        guard let surface else { return }
+        guard let surface else { return super.rightMouseUp(with: event) }
         let mods = event.modifierFlags.ghosttyMods
-        ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_RIGHT, mods)
+        if ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_RIGHT, mods) {
+            return
+        }
+        super.rightMouseUp(with: event)
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -520,6 +595,38 @@ final class GhosttySurfaceView: NSView, @preconcurrency NSTextInputClient {
 
         let mods = event.modifierFlags.ghosttyMods
         ghostty_surface_mouse_pos(surface, -1, -1, mods)
+    }
+
+    // MARK: - Context Menu
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        switch event.type {
+        case .rightMouseDown:
+            break
+        case .leftMouseDown:
+            // Ctrl+클릭은 마우스 캡처가 비활성일 때만 컨텍스트 메뉴로 처리
+            guard event.modifierFlags.contains(.control) else { return nil }
+        default:
+            return nil
+        }
+
+        let menu = NSMenu()
+
+        // 선택 영역이 있으면 복사 항목 추가
+        if let selected = readSelectedText(), !selected.isEmpty {
+            menu.addItem(withTitle: "복사", action: #selector(copySelection(_:)), keyEquivalent: "")
+        }
+        menu.addItem(withTitle: "붙여넣기", action: #selector(pasteFromClipboard(_:)), keyEquivalent: "")
+
+        return menu
+    }
+
+    @objc private func copySelection(_ sender: Any?) {
+        executeAction("copy_to_clipboard")
+    }
+
+    @objc private func pasteFromClipboard(_ sender: Any?) {
+        executeAction("paste_from_clipboard")
     }
 
     // MARK: - Text Input
