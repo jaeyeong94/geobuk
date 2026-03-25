@@ -92,9 +92,11 @@ final class PTYController: @unchecked Sendable {
         childPid = pid
 
         // DispatchIO 채널 생성
+        // cleanup handler에서 fd를 닫아 EV_VANISHED 경쟁 조건 방지
+        let fd = masterFd
         let channel = DispatchIO(type: .stream, fileDescriptor: masterFd, queue: readQueue) { [weak self] _ in
-            // Cleanup handler - fd는 close()에서 관리
-            _ = self
+            Darwin.close(fd)
+            self?.masterFd = -1
         }
         dispatchChannel = channel
 
@@ -132,20 +134,22 @@ final class PTYController: @unchecked Sendable {
         guard isActive else { return }
         isActive = false
 
-        // DispatchIO 채널 정리
-        dispatchChannel?.close(flags: .stop)
-        dispatchChannel = nil
-
-        // fd 명시적 닫기 (ARC deinit 타이밍에 의존하지 않음)
-        if masterFd >= 0 {
-            Darwin.close(masterFd)
-            masterFd = -1
-        }
-
-        // 자식 프로세스 종료
+        // 자식 프로세스 종료 (fd 닫기 전에 signal 전송)
         if childPid > 0 {
             kill(childPid, SIGHUP)
             childPid = 0
+        }
+
+        // DispatchIO 채널 정리 — cleanup handler에서 fd를 닫음
+        // dispatchChannel.close() 후 비동기적으로 cleanup handler가 호출되며,
+        // 그 안에서 Darwin.close(fd)가 실행되어 EV_VANISHED를 방지한다.
+        dispatchChannel?.close(flags: .stop)
+        dispatchChannel = nil
+
+        // DispatchIO가 없는 경우(spawn 실패 등)에만 직접 닫기
+        if masterFd >= 0 {
+            Darwin.close(masterFd)
+            masterFd = -1
         }
     }
 }
