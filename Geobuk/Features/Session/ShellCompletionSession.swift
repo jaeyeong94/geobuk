@@ -18,6 +18,11 @@ final class ShellCompletionSession {
 
     // MARK: - Lifecycle
 
+    /// start() 전에 초기 CWD를 설정한다.
+    func setCwd(_ cwd: String) {
+        currentCwd = cwd
+    }
+
     /// Headless PTY를 생성하고 프롬프트 대기
     func start() {
         guard session == nil else { return }

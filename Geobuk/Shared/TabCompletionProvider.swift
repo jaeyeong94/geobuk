@@ -27,6 +27,7 @@ final class TabCompletionProvider {
     private func ensureStarted() {
         guard !hasStarted else { return }
         hasStarted = true
+        session.setCwd(currentCwd)
         session.start()
     }
 
