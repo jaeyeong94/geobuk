@@ -36,17 +36,20 @@ final class HeadlessSession: @unchecked Sendable {
         cwd: String,
         shell: String?,
         bufferCapacity: Int = 1000,
-        ptyController: PTYControlling? = nil
+        ptyController: PTYControlling? = nil,
+        extraEnvironment: [String: String] = [:]
     ) {
         self.name = name
         self.outputBuffer = RingBuffer(capacity: bufferCapacity)
         self.ptyController = ptyController ?? PTYController()
 
         do {
+            var env = ["GEOBUK_SESSION": name]
+            env.merge(extraEnvironment) { _, new in new }
             try self.ptyController.spawn(
                 shell: shell,
                 cwd: cwd,
-                environment: ["GEOBUK_SESSION": name],
+                environment: env,
                 onRead: { [weak self] data in
                     self?.handleOutput(data)
                 }

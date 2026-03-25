@@ -63,9 +63,13 @@ final class PTYController: @unchecked Sendable {
                 _ = chdir(NSHomeDirectory())
             }
 
-            // 환경변수 설정
+            // 환경변수 설정 (빈 값은 unset 처리)
             for (key, value) in environment {
-                setenv(key, value, 1)
+                if value.isEmpty {
+                    unsetenv(key)
+                } else {
+                    setenv(key, value, 1)
+                }
             }
             setenv("TERM", "xterm-256color", 1)
 

@@ -32,11 +32,17 @@ final class ShellCompletionSession {
 
         // 사용자의 일반 셸을 그대로 사용 (completion 환경 유지)
         // ZDOTDIR 등을 커스텀하지 않음 — 사용자의 .zshrc에서 compinit이 이미 로드됨
+        // GEOBUK_SURFACE_ID/SOCKET_PATH를 해제하여 셸 통합 훅이 활성화되지 않도록 함
         session = HeadlessSession(
             name: "__geobuk_completion__",
             cwd: currentCwd,
             shell: shell,
-            bufferCapacity: 500
+            bufferCapacity: 500,
+            extraEnvironment: [
+                "GEOBUK_SURFACE_ID": "",
+                "GEOBUK_SOCKET_PATH": "",
+                "GEOBUK_COMPLETION": "1"
+            ]
         )
 
         // 셸이 초기화될 시간을 준 뒤 프롬프트 마커 설정
@@ -93,26 +99,43 @@ final class ShellCompletionSession {
         session.sendSpecialKey(.tab)
 
         // 3. 완성 결과 대기
-        try? await Task.sleep(for: .milliseconds(400))
+        try? await Task.sleep(for: .milliseconds(500))
 
-        // 4. 출력 캡처
-        let output = session.captureOutput(lines: 50)
-
-        // 5. 상태 복원: Ctrl+U로 입력 줄 삭제, Ctrl+C로 안전하게 프롬프트 복귀
+        // 4. 상태 복원: Ctrl+C로 부분 입력 취소
         session.sendSpecialKey(.ctrlC)
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(200))
+
+        // 5. endMarker 전송 후 대기
         session.sendKeys("echo \(Self.endMarker)\n")
         _ = await waitForMarker(Self.endMarker, timeout: 1.0)
 
-        // 6. 마커 사이의 출력 추출 및 파싱
+        // 6. 출력 캡처 (beginMarker ~ endMarker 범위 포함)
+        let output = session.captureOutput(lines: 100)
+
+        // 7. 마커 사이의 출력 추출 및 파싱
         let completionOutput = extractCompletionOutput(from: output, input: input)
 
+        GeobukLogger.debug(.app, "Tab completion raw", context: [
+            "input": input,
+            "extracted": String(completionOutput.prefix(200)),
+            "outputLines": "\(output.components(separatedBy: .newlines).count)"
+        ])
+
         let shell = detectShell()
+        let results: [String]
         if shell.contains("zsh") {
-            return TabCompletionParser.parseZsh(input: input, output: completionOutput)
+            results = TabCompletionParser.parseZsh(input: input, output: completionOutput)
         } else {
-            return TabCompletionParser.parseBash(input: input, output: completionOutput)
+            results = TabCompletionParser.parseBash(input: input, output: completionOutput)
         }
+
+        GeobukLogger.debug(.app, "Tab completion results", context: [
+            "input": input,
+            "count": "\(results.count)",
+            "results": results.prefix(5).joined(separator: ", ")
+        ])
+
+        return results
     }
 
     /// 세션 재시작 (비정상 시)
